@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Menu } from 'lucide-react';
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Sidebar } from '@/app/components/Sidebar';
@@ -143,7 +143,7 @@ export default function App() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { theme, toggleTheme } = useThemeToggle();
   const { currentPage, setCurrentPage, basePath } = useOpsRouteState();
-  const currentPageMemo = currentPage;
+  const currentPageMemo = useMemo(() => currentPage, [currentPage]);
 
   useEffect(() => {
     let cancelled = false;
