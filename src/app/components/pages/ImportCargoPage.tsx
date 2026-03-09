@@ -10,7 +10,7 @@ function requiredDocsForCategory(category: Category | ''): string[] {
   if (!category) return [];
   const base = ['BILL_OF_LADING', 'COMMERCIAL_INVOICE', 'PACKING_LIST'];
   if (category === 'MEDS_BEVERAGE') return [...base, 'IMPORT_LICENSE'];
-  if (category === 'RAW_MATERIALS') return [...base, 'IMPORT_PERMIT'];
+  if (category === 'RAW_MATERIALS') return [...base];
   return [...base, 'TYPE_APPROVAL'];
 }
 
