@@ -532,7 +532,7 @@ export function CargoRegistryPage({
                     }
                     setForm((f) => ({ ...f, client_id: v }));
                   }}
-                  className="w-full px-3 py-2 rounded border bg-transparent text-black"
+                  className="w-full px-3 py-2 rounded border bg-background text-foreground"
                   style={{ borderColor: 'var(--border)' }}
                   disabled={clientsLoading}
                 >
@@ -553,7 +553,7 @@ export function CargoRegistryPage({
                   <select
                     value={form.category}
                     onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as CargoCategory }))}
-                    className="w-full px-3 py-2 rounded border bg-transparent text-black"
+                    className="w-full px-3 py-2 rounded border bg-background text-foreground"
                     style={{ borderColor: 'var(--border)' }}
                   >
                     <option value="ELECTRONICS">Electronics</option>
@@ -569,7 +569,7 @@ export function CargoRegistryPage({
                     min={1}
                     value={form.container_count}
                     onChange={(e) => setForm((f) => ({ ...f, container_count: Number(e.target.value) || 1 }))}
-                    className="w-full px-3 py-2 rounded border bg-transparent"
+                    className="w-full px-3 py-2 rounded border bg-background text-foreground"
                     style={{ borderColor: 'var(--border)' }}
                   />
                 </div>
@@ -580,7 +580,7 @@ export function CargoRegistryPage({
                 <input
                   value={form.container_id}
                   onChange={(e) => setForm((f) => ({ ...f, container_id: e.target.value }))}
-                  className="w-full px-3 py-2 rounded border bg-transparent"
+                  className="w-full px-3 py-2 rounded border bg-background text-foreground"
                   style={{ borderColor: 'var(--border)' }}
                   placeholder="e.g., MSCU1234567"
                 />
@@ -591,7 +591,7 @@ export function CargoRegistryPage({
                 <input
                   value={form.origin}
                   onChange={(e) => setForm((f) => ({ ...f, origin: e.target.value }))}
-                  className="w-full px-3 py-2 rounded border bg-transparent"
+                  className="w-full px-3 py-2 rounded border bg-background text-foreground"
                   style={{ borderColor: 'var(--border)' }}
                   placeholder="e.g., Mombasa, KN"
                 />
@@ -605,7 +605,7 @@ export function CargoRegistryPage({
                 <input
                   value={form.destination}
                   onChange={(e) => setForm((f) => ({ ...f, destination: e.target.value }))}
-                  className="w-full px-3 py-2 rounded border bg-transparent"
+                  className="w-full px-3 py-2 rounded border bg-background text-foreground"
                   style={{ borderColor: 'var(--border)' }}
                   placeholder="e.g., Kigali, RW"
                 />
@@ -617,17 +617,18 @@ export function CargoRegistryPage({
                   type="date"
                   value={form.expected_arrival_date}
                   onChange={(e) => setForm((f) => ({ ...f, expected_arrival_date: e.target.value }))}
-                  className="w-full px-3 py-2 rounded border bg-transparent text-black"
+                  className="w-full px-3 py-2 rounded border bg-background text-foreground"
                   style={{ borderColor: 'var(--border)' }}
-                />
+                >
               </div>
 
               <div>
                 <div className="text-sm opacity-70 mb-1">Required documents (auto)</div>
-                <div className="text-xs opacity-60">
+                <div className="text-xs text-muted-foreground">
                   {requiredDocsForCategory(form.category)
                     .filter((doc) => !['WH7_DOC', 'EXIT_NOTE', 'IMPORT_PERMIT'].includes(doc))
                     .map(formatLabel)
+                    .filter((label) => !['WH7', 'Exit Note', 'Exit note'].includes(label))
                     .join(', ')}
                 </div>
               </div>
