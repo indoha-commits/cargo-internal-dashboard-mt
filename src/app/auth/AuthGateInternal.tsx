@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { initSupabaseAuth, setSessionFromUrlHash } from './supabase';
-import { getMe, heartbeatInternalSession } from '../api/ops';
+import { claimInternalSession, getMe, heartbeatInternalSession } from '../api/ops';
 
 function requireEnv(name: string): string {
   const v = (import.meta.env as any)[name] as string | undefined;
@@ -34,6 +34,7 @@ function getOrCreateInternalSessionId(): string {
 
 export function AuthGateInternal({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
@@ -57,7 +58,18 @@ export function AuthGateInternal({ children }: { children: React.ReactNode }) {
       if (!mounted) return;
 
       try {
-        unsubscribe = await initSupabaseAuth(() => {});
+        unsubscribe = await initSupabaseAuth(async () => {
+          const id = getOrCreateInternalSessionId();
+          setSessionId(id);
+          try {
+            const result = await claimInternalSession(id);
+            if ('ok' in result && !result.ok && result.error === 'session_locked') {
+              alert(result.detail);
+            }
+          } catch (e) {
+            console.warn('Failed to claim internal session', e);
+          }
+        });
       } catch (e) {
         console.warn('Failed to initialize Supabase auth', e);
       } finally {
@@ -72,6 +84,18 @@ export function AuthGateInternal({ children }: { children: React.ReactNode }) {
       unsubscribe?.();
     };
   }, []);
+
+  useEffect(() => {
+    if (!ready || !sessionId) return;
+
+    const interval = window.setInterval(() => {
+      void heartbeatInternalSession(sessionId).catch((err) =>
+        console.warn('Failed to heartbeat internal session', err)
+      );
+    }, 5 * 60 * 1000);
+
+    return () => window.clearInterval(interval);
+  }, [ready, sessionId]);
 
   if (!ready) {
     return null;
