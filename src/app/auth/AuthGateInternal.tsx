@@ -49,7 +49,10 @@ export function AuthGateInternal({ children }: { children: React.ReactNode }) {
           const nextPath = callbackIndex === -1
             ? window.location.pathname
             : window.location.pathname.slice(0, callbackIndex) || '/';
+          // Clear the URL hash containing sensitive tokens for security
           window.history.replaceState({}, document.title, nextPath);
+          // Also clear the hash immediately
+          window.location.hash = '';
         } catch (e) {
           console.warn('Failed to set session from hash', e);
         }
