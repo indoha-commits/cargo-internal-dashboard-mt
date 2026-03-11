@@ -9,6 +9,7 @@ import {
 import { getOpsDocumentSignedUrl } from '@/app/api/client';
 import { getOpsApprovalSignedUrl } from '@/app/api/ops';
 import { formatLabel } from '@/app/api/categories';
+import { getSupabase } from '@/app/auth/supabase';
 
 type Item = OpsValidationQueueItem;
 
@@ -91,6 +92,7 @@ export function ValidationPage() {
     setItems(res.items ?? []);
   };
 
+  // Fetch initial validation queue
   useEffect(() => {
     let cancelled = false;
 
@@ -110,6 +112,65 @@ export function ValidationPage() {
     load();
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  // Real-time subscriptions for validation queue updates
+  useEffect(() => {
+    const supabase = getSupabase();
+
+    // Subscribe to cargo_client_approvals table (approval uploads/updates)
+    const approvalsSubscription = supabase
+      .channel('validation_queue_approvals')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'cargo_client_approvals',
+        },
+        () => {
+          refresh();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to client_documents table (document verification changes)
+    const documentsSubscription = supabase
+      .channel('validation_queue_documents')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'client_documents',
+        },
+        () => {
+          refresh();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to cargo table (general cargo updates)
+    const cargoSubscription = supabase
+      .channel('validation_queue_cargo')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'cargo',
+        },
+        () => {
+          refresh();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(approvalsSubscription);
+      supabase.removeChannel(documentsSubscription);
+      supabase.removeChannel(cargoSubscription);
     };
   }, []);
 

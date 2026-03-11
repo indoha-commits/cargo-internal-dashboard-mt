@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
 import { getOpsCargoTimeline, getOpsDocumentSignedUrl, type OpsCargoTimelineResponse } from '@/app/api/ops';
 import { requiredDocsForCategory, type CargoCategory, formatLabel as formatCategoryLabel } from '@/app/api/categories';
+import { getSupabase } from '@/app/auth/supabase';
 
 interface CargoTimelinePageProps {
   preselectedCargoId?: string;
@@ -130,6 +131,75 @@ export function CargoTimelinePage({ preselectedCargoId = '' }: CargoTimelinePage
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preselectedCargoId]);
+
+  // Real-time subscriptions for cargo timeline updates
+  useEffect(() => {
+    if (!data?.cargo.id) return;
+
+    const supabase = getSupabase();
+    const cargoId = data.cargo.id;
+
+    const refreshTimeline = () => {
+      load(cargoId);
+    };
+
+    // Subscribe to cargo_events table (timeline updates)
+    const eventsSubscription = supabase
+      .channel(`cargo_timeline_events_${cargoId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'cargo_events',
+          filter: `cargo_id=eq.${cargoId}`,
+        },
+        () => {
+          refreshTimeline();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to client_documents table (document updates)
+    const documentsSubscription = supabase
+      .channel(`cargo_timeline_documents_${cargoId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'client_documents',
+          filter: `cargo_id=eq.${cargoId}`,
+        },
+        () => {
+          refreshTimeline();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to cargo_client_approvals table (approval updates)
+    const approvalsSubscription = supabase
+      .channel(`cargo_timeline_approvals_${cargoId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'cargo_client_approvals',
+          filter: `cargo_id=eq.${cargoId}`,
+        },
+        () => {
+          refreshTimeline();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(eventsSubscription);
+      supabase.removeChannel(documentsSubscription);
+      supabase.removeChannel(approvalsSubscription);
+    };
+  }, [data?.cargo.id]);
 
   const handleSearch = () => {
     const q = searchQuery.trim();
