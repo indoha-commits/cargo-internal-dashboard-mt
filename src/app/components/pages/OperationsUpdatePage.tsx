@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CheckCircle, Clock, Package, Search, AlertCircle } from 'lucide-react';
-import { getOpsValidationQueue } from '@/app/api/ops';
+import { getOpsValidationQueue, recordOpsCargoEvent } from '@/app/api/ops';
 
 interface PendingAction {
   cargoId: string;
@@ -60,27 +60,9 @@ export function OperationsUpdatePage() {
 
   const handleRecordAction = async (cargoId: string, actionType: string) => {
     const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
-    const baseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/undefined\b/, '');
-    const endpoint = `${baseUrl}/ops/cargo/${encodeURIComponent(cargoId)}/timeline`;
 
     try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          ...(window.location.pathname.match(/^\/t\/([^/]+)/i)
-            ? { 'x-mt-tenant-slug': window.location.pathname.match(/^\/t\/([^/]+)/i)?.[1] }
-            : {}),
-        },
-        body: JSON.stringify({ event_type: actionType }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        console.error('Failed to record event', err);
-        alert('Failed to record event. Please try again.');
-        return;
-      }
+      await recordOpsCargoEvent(cargoId, actionType);
 
       console.log(`Recording event: ${actionType} for ${cargoId} at ${timestamp}`);
 

@@ -131,6 +131,13 @@ export async function getOpsCargoTimeline(cargoId: string): Promise<OpsCargoTime
   return await fetchJson<OpsCargoTimelineResponse>(`/ops/cargo/${encodeURIComponent(cargoId)}/timeline`);
 }
 
+export async function recordOpsCargoEvent(cargoId: string, eventType: string): Promise<{ event: any }> {
+  return await fetchJson<{ event: any }>(`/ops/cargo/${encodeURIComponent(cargoId)}/timeline`, {
+    method: 'POST',
+    body: JSON.stringify({ event_type: eventType }),
+  });
+}
+
 export type OpsActivityLogResponse = {
   rows: Array<{
     timestamp: string;
