@@ -28,7 +28,10 @@ export function getAuthHeader(): Record<string, string> {
   const token = getAccessToken();
   const h: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
   const tenantSubdomain = resolveTenantSubdomain();
-  if (tenantSubdomain) h['x-mt-tenant-slug'] = tenantSubdomain;
+  if (tenantSubdomain) {
+    h['x-mt-tenant-slug'] = tenantSubdomain;
+    h['x-mt-tenant-subdomain'] = tenantSubdomain;
+  }
   if (!token) console.warn('Missing access token for API request');
   return h;
 }
