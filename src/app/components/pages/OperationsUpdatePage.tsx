@@ -60,31 +60,38 @@ export function OperationsUpdatePage() {
 
   const handleRecordAction = async (cargoId: string, actionType: string) => {
     const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
-    setCompletedActions([...completedActions, `${cargoId}-${actionType}`]);
 
     try {
-      await fetch(`${import.meta.env.VITE_API_BASE_URL}/ops/cargo/${encodeURIComponent(cargoId)}/timeline`, {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/ops/cargo/${encodeURIComponent(cargoId)}/timeline`, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          authorization: `Bearer ${localStorage.getItem('sb:token') ?? ''}`,
           ...(window.location.pathname.match(/^\/t\/([^/]+)/i)
             ? { 'x-mt-tenant-slug': window.location.pathname.match(/^\/t\/([^/]+)/i)?.[1] }
             : {}),
         },
         body: JSON.stringify({ event_type: actionType }),
       });
-    } catch {
-      // ignore
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error('Failed to record event', err);
+        alert('Failed to record event. Please try again.');
+        return;
+      }
+
+      console.log(`Recording event: ${actionType} for ${cargoId} at ${timestamp}`);
+
+      setCompletedActions((prev) => [...prev, `${cargoId}-${actionType}`]);
+      setTimeout(() => {
+        setPendingActions((prev) =>
+          prev.filter((action) => !(action.cargoId === cargoId && action.actionType === actionType))
+        );
+      }, 500);
+    } catch (e) {
+      console.error('Failed to record event', e);
+      alert('Failed to record event. Please try again.');
     }
-
-    console.log(`Recording event: ${actionType} for ${cargoId} at ${timestamp}`);
-
-    setTimeout(() => {
-      setPendingActions((prev) =>
-        prev.filter((action) => !(action.cargoId === cargoId && action.actionType === actionType))
-      );
-    }, 1000);
   };
 
   const filteredActions = pendingActions.filter((action) => {
