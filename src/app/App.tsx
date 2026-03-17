@@ -133,29 +133,15 @@ function OpsPageRenderer({
 }
 
 export default function App() {
-  const [dataSourceConnected, setDataSourceConnected] = useState<boolean | null>(null);
+  const [dataSourceConnected, setDataSourceConnected] = useState<boolean | null>(true);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { theme, toggleTheme } = useThemeToggle();
   const { currentPage, setCurrentPage } = useOpsRouteState();
   const currentPageMemo = useMemo(() => currentPage, [currentPage]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    // Auto-refresh state after OAuth callback by checking connection on load
-    (async () => {
-      try {
-        const res = await fetchJson<{ data_source: { status: string } | null }>('/ops/data-source', { method: 'GET' });
-        const connected = res.data_source?.status === 'connected';
-        if (!cancelled) setDataSourceConnected(connected);
-      } catch {
-        if (!cancelled) setDataSourceConnected(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+    // External data sources disabled; skip checks
+    setDataSourceConnected(true);
   }, []);
 
   // Gate: show data source setup until connected
