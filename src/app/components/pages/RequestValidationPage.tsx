@@ -181,7 +181,9 @@ export function RequestValidationPage() {
           <div className="bg-card rounded-lg border w-full max-w-lg" style={{ borderColor: 'var(--border)' }}>
             <div className="px-6 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
               <h3 className="text-lg">Reject request</h3>
-              <p className="text-sm opacity-60">Provide a reason for rejection.</p>
+              <p className="text-sm opacity-60">
+                Provide a reason for rejection. Uploaded {new Date(rejectDialog.request.created_at).toLocaleString()}.
+              </p>
             </div>
             <div className="p-6 space-y-4">
               <Input

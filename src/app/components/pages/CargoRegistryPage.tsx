@@ -426,7 +426,7 @@ export function CargoRegistryPage({
       <div className="mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 sm:gap-6">
         <div>
           <h1>Cargo Registry</h1>
-          <p className="text-sm opacity-60 mt-2">All cargos across clients (ops)</p>
+          <p className="text-sm opacity-60 mt-2">All cargos across clients (ops). “Create New Cargo” creates a single container.</p>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">

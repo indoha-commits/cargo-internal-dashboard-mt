@@ -16,6 +16,7 @@ export function OperationsUpdatePage() {
   const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
   const [loading, setLoading] = useState(true);
   const [completedActions, setCompletedActions] = useState<string[]>([]);
+  const [completedRecords, setCompletedRecords] = useState<PendingAction[]>([]);
   const [filterType, setFilterType] = useState<'all' | 'PHYSICAL_VERIFICATION' | 'WAREHOUSE_ARRIVAL'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [cargoOptions, setCargoOptions] = useState<PendingAction[]>([]);
@@ -45,7 +46,7 @@ export function OperationsUpdatePage() {
           });
 
         setCargoOptions(actions);
-        setPendingActions([]);
+        setPendingActions(actions);
       } catch (err) {
         console.error('Failed to load cargo data:', err);
       } finally {
@@ -67,6 +68,12 @@ export function OperationsUpdatePage() {
       console.log(`Recording event: ${actionType} for ${cargoId} at ${timestamp}`);
 
       setCompletedActions((prev) => [...prev, `${cargoId}-${actionType}`]);
+      setCompletedRecords((prev) => {
+        const existing = prev.some((record) => record.cargoId === cargoId && record.actionType === actionType);
+        if (existing) return prev;
+        const record = pendingActions.find((action) => action.cargoId === cargoId && action.actionType === actionType);
+        return record ? [{ ...record }, ...prev] : prev;
+      });
       setTimeout(() => {
         setPendingActions((prev) =>
           prev.filter((action) => !(action.cargoId === cargoId && action.actionType === actionType))
@@ -267,18 +274,36 @@ export function OperationsUpdatePage() {
             </div>
           </div>
         </div>
+
+        <div className="bg-card rounded-lg border p-5" style={{ borderColor: 'var(--border)' }}>
+          <div className="flex items-center gap-3 mb-2">
+            <div
+              className="w-10 h-10 rounded-lg flex items-center justify-center"
+              style={{ backgroundColor: 'rgba(34, 197, 94, 0.12)' }}
+            >
+              <CheckCircle className="w-5 h-5" style={{ color: '#22c55e' }} />
+            </div>
+            <div>
+              <div className="text-sm opacity-60">Completed Actions</div>
+              <div className="text-2xl" style={{ fontWeight: 600 }}>
+                {completedRecords.length}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Pending Actions List */}
       <div className="space-y-4">
-        {filteredActions.length === 0 ? (
+        {filteredActions.length === 0 && completedRecords.length === 0 ? (
           <div className="bg-card rounded-lg border p-12 text-center" style={{ borderColor: 'var(--border)' }}>
             <p className="opacity-60">
               {searchQuery ? 'No actions found matching your search' : 'No pending actions'}
             </p>
           </div>
         ) : (
-          filteredActions.map((action) => {
+          <>
+            {filteredActions.map((action) => {
             const completed = isActionCompleted(action.cargoId, action.actionType);
 
             return (
@@ -287,7 +312,7 @@ export function OperationsUpdatePage() {
                 className="bg-card rounded-lg border p-6 transition-all"
                 style={{
                   borderColor: 'var(--border)',
-                  opacity: completed ? 0.5 : 1,
+                  opacity: completed ? 0.6 : 1,
                 }}
               >
                 <div className="flex items-start justify-between">
@@ -378,7 +403,24 @@ export function OperationsUpdatePage() {
                 </div>
               </div>
             );
-          })
+          })}
+            {completedRecords.length > 0 && (
+              <div className="bg-card rounded-lg border p-6" style={{ borderColor: 'var(--border)' }}>
+                <div className="text-sm font-semibold mb-3">Completed Actions</div>
+                <div className="space-y-3">
+                  {completedRecords.map((record) => (
+                    <div key={`${record.cargoId}-${record.actionType}`} className="flex items-center justify-between text-sm">
+                      <div>
+                        <div className="font-mono" style={{ fontWeight: 600 }}>{record.cargoId}</div>
+                        <div className="text-xs opacity-60">{record.clientName}</div>
+                      </div>
+                      <div className="text-xs opacity-60">{record.actionType.replace('_', ' ')}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
