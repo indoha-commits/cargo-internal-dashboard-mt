@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, ExternalLink, Loader2, XCircle } from 'lucide-react';
 import { getSupabase } from '@/app/auth/supabase';
 import { Button } from '@/app/components/ui/button';
@@ -38,6 +39,7 @@ async function getSignedUrl(path: string): Promise<string> {
 }
 
 export function RequestValidationPage() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [requests, setRequests] = useState<RequestRow[]>([]);
@@ -86,6 +88,7 @@ export function RequestValidationPage() {
     try {
       await approveRequest(request.id);
       await refresh();
+      navigate('/cargo-registry');
     } finally {
       setBusy((m) => ({ ...m, [request.id]: false }));
     }
@@ -127,14 +130,14 @@ export function RequestValidationPage() {
             {pendingRequests.map((req) => {
               const busyReq = Boolean(busy[req.id]);
               return (
-                <div key={req.id} className="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
+                <div key={req.id} className="px-6 py-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="space-y-1">
                     <div className="text-sm" style={{ fontWeight: 600 }}>{req.client_name}</div>
-                    <div className="text-xs opacity-60 mt-1">
+                    <div className="text-xs opacity-60">
                       {req.file_name ?? 'Bill of Lading'} · {new Date(req.created_at).toLocaleString()}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Button
                       type="button"
                       variant="outline"
@@ -142,18 +145,17 @@ export function RequestValidationPage() {
                       onClick={() => openDocument(req)}
                     >
                       <ExternalLink className="w-4 h-4 mr-2" />
-                      View
+                      View file
                     </Button>
                     <Button
                       type="button"
-                      variant="outline"
                       size="sm"
                       disabled={busyReq}
                       onClick={() => handleApprove(req)}
-                      className="border-green-600 text-green-600"
+                      className="bg-green-600 text-white hover:bg-green-700"
                     >
                       {busyReq ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                      <span className="ml-2">Approve</span>
+                      <span className="ml-2">Approve & create cargo</span>
                     </Button>
                     <Button
                       type="button"
