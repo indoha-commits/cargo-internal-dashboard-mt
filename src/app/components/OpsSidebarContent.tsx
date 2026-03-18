@@ -1,4 +1,4 @@
-import { FileText, LayoutDashboard, Clock, Package, Activity, CheckSquare, DownloadCloud, LogOut, ClipboardCheck } from 'lucide-react';
+import { FileText, LayoutDashboard, Clock, Package, Activity, CheckSquare, DownloadCloud, LogOut, ClipboardCheck, Inbox } from 'lucide-react';
 
 interface OpsSidebarContentProps {
   currentPage: string;
@@ -10,6 +10,7 @@ interface OpsSidebarContentProps {
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'pending-documents', label: 'Pending Documents', icon: FileText },
+  { id: 'validation-requests', label: 'Validation Requests', icon: Inbox },
   { id: 'validation', label: 'Validation Queue', icon: CheckSquare },
   { id: 'operations-update', label: 'Operations Update', icon: ClipboardCheck },
   { id: 'import-cargo', label: 'Import Cargo', icon: DownloadCloud },

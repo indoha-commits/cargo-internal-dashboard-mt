@@ -9,6 +9,7 @@ import { useThemeToggle } from '@/app/hooks/useThemeToggle';
 import { DashboardPage } from '@/app/components/pages/DashboardPage';
 import { PendingDocumentsPage } from '@/app/components/pages/PendingDocumentsPage';
 import { ValidationPage } from '@/app/components/pages/ValidationPage';
+import { RequestValidationPage } from '@/app/components/pages/RequestValidationPage';
 import { ImportCargoPage } from '@/app/components/pages/ImportCargoPage';
 import { CargoTimelinePage } from '@/app/components/pages/CargoTimelinePage';
 import { CargoRegistryPage } from '@/app/components/pages/CargoRegistryPage';
@@ -98,6 +99,8 @@ function OpsPageRenderer({
       return <DashboardPage />;
     case 'pending-documents':
       return <PendingDocumentsPage />;
+    case 'validation-requests':
+      return <RequestValidationPage />;
     case 'validation':
       return <ValidationPage />;
     case 'import-cargo':

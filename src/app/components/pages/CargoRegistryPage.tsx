@@ -81,7 +81,6 @@ export function CargoRegistryPage({
   const [form, setForm] = useState<{
     client_id: string;
     container_id: string;
-    container_number: string;
     expected_arrival_date: string;
     container_count: number;
     category: CargoCategory;
@@ -90,7 +89,6 @@ export function CargoRegistryPage({
   }>({
     client_id: '',
     container_id: '',
-    container_number: '',
     expected_arrival_date: '',
     container_count: 1,
     category: 'ELECTRONICS',
@@ -333,10 +331,6 @@ export function CargoRegistryPage({
       alert('Please enter a container id');
       return;
     }
-    if (!form.container_number.trim()) {
-      alert('Please enter a container number');
-      return;
-    }
     if (!form.expected_arrival_date) {
       alert('Please select expected arrival date');
       return;
@@ -349,7 +343,7 @@ export function CargoRegistryPage({
       await createOpsCargo({
         client_id: form.client_id,
         container_id: form.container_id.trim(),
-        container_number: form.container_number.trim(),
+        container_number: form.container_id.trim(),
         expected_arrival_date: form.expected_arrival_date,
         category: form.category,
         required_documents,
@@ -361,7 +355,6 @@ export function CargoRegistryPage({
       setForm({
         client_id: '',
         container_id: '',
-        container_number: '',
         expected_arrival_date: '',
         container_count: 1,
         category: 'ELECTRONICS',
@@ -851,17 +844,6 @@ export function CargoRegistryPage({
                   className="w-full px-3 py-2 rounded border bg-background text-foreground"
                   style={{ borderColor: 'var(--border)' }}
                   placeholder="e.g., CONTAINER-2024-001"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm opacity-70 mb-1">Container Number</label>
-                <input
-                  value={form.container_number}
-                  onChange={(e) => setForm((f) => ({ ...f, container_number: e.target.value }))}
-                  className="w-full px-3 py-2 rounded border bg-background text-foreground"
-                  style={{ borderColor: 'var(--border)' }}
-                  placeholder="e.g., MSCU1234567"
                 />
               </div>
 
