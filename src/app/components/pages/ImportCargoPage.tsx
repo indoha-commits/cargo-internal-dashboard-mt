@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Upload, File, CheckCircle2, XCircle } from 'lucide-react';
 
 import { getOpsClients } from '@/app/api/ops';
 import { fetchJson } from '@/app/api/client';
@@ -32,6 +32,7 @@ export function ImportCargoPage() {
   
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, File>>({});
+  const [draggedOver, setDraggedOver] = useState<string | null>(null);
 
   const requiredDocs = useMemo(() => requiredDocsForCategory(category), [category]);
   const cargoIdPlaceholder = category ? `Enter cargo ID (${category})` : 'Enter cargo ID';
@@ -281,30 +282,118 @@ export function ImportCargoPage() {
         ) : (
           <>
             <div className="border-t pt-6 mt-6" style={{ borderColor: 'var(--border)' }}>
-              <h3 className="text-lg font-semibold mb-4">Upload Required Documents</h3>
-              <p className="text-sm opacity-60 mb-6">
-                {startingMilestone === 'DOCS_UPLOADED' 
-                  ? 'Upload the required documents for this cargo.'
-                  : 'Documents are marked as verified. You can upload them now or skip.'}
-              </p>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold">Upload Required Documents</h3>
+                  <p className="text-sm opacity-60 mt-1">
+                    {startingMilestone === 'DOCS_UPLOADED' 
+                      ? 'Upload the required documents for this cargo.'
+                      : 'Documents are marked as verified. You can upload them now or skip.'}
+                  </p>
+                </div>
+                <div className="text-sm font-medium px-4 py-2 rounded-lg" style={{ backgroundColor: 'var(--gold-accent)', color: 'var(--navy-deep)' }}>
+                  {Object.keys(uploadedFiles).length} / {requiredDocs.length} files
+                </div>
+              </div>
+              
+              {/* Progress bar */}
+              <div className="mb-6">
+                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                  <div 
+                    className="h-full transition-all duration-300 rounded-full"
+                    style={{ 
+                      width: `${(Object.keys(uploadedFiles).length / requiredDocs.length) * 100}%`,
+                      backgroundColor: 'var(--gold-accent)'
+                    }}
+                  />
+                </div>
+              </div>
               
               <div className="space-y-4">
                 {requiredDocs.map((docType) => (
-                  <div key={docType} className="border rounded-md p-4" style={{ borderColor: 'var(--border)' }}>
-                    <div className="text-sm font-medium mb-2">{docType}</div>
-                    <input
-                      type="file"
-                      className="text-sm w-full"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
+                  <div key={docType} className="border rounded-lg p-5 transition-all hover:border-opacity-80" style={{ borderColor: uploadedFiles[docType] ? 'var(--gold-accent)' : 'var(--border)', backgroundColor: uploadedFiles[docType] ? 'rgba(212, 175, 55, 0.05)' : 'transparent' }}>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <File className="w-4 h-4 opacity-60" />
+                        <span className="text-sm font-medium">{docType}</span>
+                      </div>
+                      {uploadedFiles[docType] && (
+                        <CheckCircle2 className="w-5 h-5 text-green-600" />
+                      )}
+                    </div>
+                    
+                    <label 
+                      className="block cursor-pointer"
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDraggedOver(docType);
+                      }}
+                      onDragLeave={() => setDraggedOver(null)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setDraggedOver(null);
+                        const file = e.dataTransfer.files?.[0];
                         if (file) {
                           setUploadedFiles(prev => ({ ...prev, [docType]: file }));
                         }
                       }}
-                    />
-                    {uploadedFiles[docType] && (
-                      <div className="text-xs opacity-60 mt-1">Selected: {uploadedFiles[docType].name}</div>
-                    )}
+                    >
+                      <div 
+                        className="border-2 border-dashed rounded-lg p-6 text-center transition-all hover:border-opacity-60 hover:bg-opacity-50" 
+                        style={{ 
+                          borderColor: draggedOver === docType ? 'var(--gold-accent)' : 'var(--border)', 
+                          backgroundColor: draggedOver === docType ? 'rgba(212, 175, 55, 0.1)' : 'var(--background)',
+                          transform: draggedOver === docType ? 'scale(1.02)' : 'scale(1)'
+                        }}
+                      >
+                        {uploadedFiles[docType] ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-center gap-2 text-sm font-medium" style={{ color: 'var(--gold-accent)' }}>
+                              <File className="w-5 h-5" />
+                              <span>{uploadedFiles[docType].name}</span>
+                            </div>
+                            <div className="text-xs opacity-60">
+                              {(uploadedFiles[docType].size / 1024).toFixed(1)} KB
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setUploadedFiles(prev => {
+                                  const newFiles = { ...prev };
+                                  delete newFiles[docType];
+                                  return newFiles;
+                                });
+                              }}
+                              className="text-xs text-red-600 hover:text-red-700 underline mt-2"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <Upload className="w-8 h-8 mx-auto opacity-40" />
+                            <div className="text-sm font-medium opacity-70">
+                              Click to upload or drag and drop
+                            </div>
+                            <div className="text-xs opacity-50">
+                              PDF, DOC, DOCX, JPG, PNG (max 10MB)
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setUploadedFiles(prev => ({ ...prev, [docType]: file }));
+                          }
+                        }}
+                      />
+                    </label>
                   </div>
                 ))}
               </div>
