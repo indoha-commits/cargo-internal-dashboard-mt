@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, Upload, File, CheckCircle2, XCircle } from 'lucide-react';
+import { ChevronDown, Upload, File, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 
 import { getOpsClients } from '@/app/api/ops';
 import { fetchJson } from '@/app/api/client';
@@ -213,7 +213,7 @@ export function ImportCargoPage() {
         }
       }
       
-      setSuccess(`Cargo ${cargoId} registered successfully${needsAssessment ? ' with assessment documents' : ''}`);
+      setSuccess(`Cargo ${cargoId} registered successfully${needsAssessment ? ' with customs clearance documents' : ''}`);
       
       // Reset form
       setShowUploadForm(false);
@@ -227,7 +227,20 @@ export function ImportCargoPage() {
       setSelectedCargoId('');
       setMilestoneCompletedAt('');
     } catch (e) {
-      setError(String(e));
+      const errorMsg = String(e);
+      
+      // Parse error for user-friendly messages
+      if (errorMsg.includes('already_exists') || errorMsg.includes('409')) {
+        setError(`Cargo "${selectedCargoId}" already exists in the system. Please check the cargo list or use a different ID.`);
+      } else if (errorMsg.includes('signed_upload_failed')) {
+        setError('File upload failed. Please check your internet connection and try again.');
+      } else if (errorMsg.includes('missing_field')) {
+        setError('Please fill in all required fields before submitting.');
+      } else if (errorMsg.includes('404') || errorMsg.includes('not_found')) {
+        setError('API endpoint not found. Please contact support.');
+      } else {
+        setError(`Registration failed: ${errorMsg}`);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -601,10 +614,46 @@ export function ImportCargoPage() {
         )}
 
         {error && (
-          <div className="mt-4 p-3 rounded-md border border-red-300 bg-red-50 text-red-800 text-sm">{error}</div>
+          <div className="mt-4 p-4 rounded-lg border border-red-300 bg-red-50 text-red-800">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <div className="font-medium text-sm mb-1">Registration Error</div>
+                <div className="text-sm">{error}</div>
+                {error.includes('already exists') && (
+                  <a
+                    href={`/cargo/${selectedCargoId}`}
+                    className="inline-block mt-2 text-sm font-medium underline hover:no-underline"
+                  >
+                    View existing cargo →
+                  </a>
+                )}
+              </div>
+              <button
+                onClick={() => setError(null)}
+                className="text-red-600 hover:text-red-800"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
         )}
         {success && (
-          <div className="mt-4 p-3 rounded-md border border-green-300 bg-green-50 text-green-800 text-sm">{success}</div>
+          <div className="mt-4 p-4 rounded-lg border border-green-300 bg-green-50 text-green-800">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <div className="font-medium text-sm mb-1">Success!</div>
+                <div className="text-sm">{success}</div>
+              </div>
+              <button
+                onClick={() => setSuccess(null)}
+                className="text-green-600 hover:text-green-800"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>
