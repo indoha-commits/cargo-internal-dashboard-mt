@@ -76,18 +76,11 @@ export function ImportCargoPage() {
         setLoadingCargos(true);
         setError(null);
 
-        // We call the worker directly through the ops API base.
-        // This endpoint is implemented in the worker.
-        const data = await fetchJson<{ cargos: string[]; summary?: any }>(
+        const data = await fetchJson<{ cargos: string[] }>(
           `/ops/drive/client/${encodeURIComponent(selectedClientId)}/cargos?category=${encodeURIComponent(category)}`,
           { method: 'GET' }
         );
         setCargos(data.cargos ?? []);
-        if (data.summary) {
-          setSuccess(
-            `Sync: ${data.summary.docs_imported} docs imported across ${data.summary.cargos_found} cargos. Missing required docs for ${data.summary.cargos_missing_required_docs} cargos.`
-          );
-        }
       } catch (e) {
         setError(String(e));
         setCargos([]);
@@ -121,7 +114,7 @@ export function ImportCargoPage() {
           starting_milestone: startingMilestone,
         }),
       });
-      setSuccess(`Imported cargo ${data.cargo_id}`);
+      setSuccess(`Saved cargo ${data.cargo_id}`);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -132,9 +125,9 @@ export function ImportCargoPage() {
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-8">
-        <h1>Import Cargo</h1>
+        <h1>Register Cargo</h1>
         <p className="text-sm opacity-60 mt-2">
-          Import an existing cargo from Google Drive using folder structure clientId/cargoId/DOC_TYPE.
+          Register a cargo that already started. Select which milestone is completed and upload documents later.
         </p>
       </div>
 
@@ -311,7 +304,7 @@ export function ImportCargoPage() {
             className="px-5 py-2.5 rounded-md text-sm transition-colors duration-150 disabled:opacity-60"
             style={{ backgroundColor: 'var(--gold-accent)', color: 'var(--navy-deep)', fontWeight: 600 }}
           >
-            {submitting ? 'Importing…' : 'Import Cargo'}
+            {submitting ? 'Saving…' : 'Register Cargo'}
           </button>
         </div>
       </div>
