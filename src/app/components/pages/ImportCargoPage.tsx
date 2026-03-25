@@ -30,8 +30,8 @@ export function ImportCargoPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   
-  const [registeredCargoId, setRegisteredCargoId] = useState<string | null>(null);
-  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showUploadForm, setShowUploadForm] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<Record<string, File>>({});
 
   const requiredDocs = useMemo(() => requiredDocsForCategory(category), [category]);
   const cargoIdPlaceholder = category ? `Enter cargo ID (${category})` : 'Enter cargo ID';
@@ -72,6 +72,15 @@ export function ImportCargoPage() {
     void load();
   }, []);
 
+  const onProceed = () => {
+    setError(null);
+    if (!category) return setError('Select a category');
+    if (!selectedClientId) return setError('Select a client');
+    if (!selectedCargoId.trim()) return setError('Enter a cargo ID');
+    
+    setShowUploadForm(true);
+  };
+
   const onSubmit = async () => {
     setError(null);
     setSuccess(null);
@@ -94,10 +103,15 @@ export function ImportCargoPage() {
         }),
       });
       
-      // Show upload modal after successful registration
-      setRegisteredCargoId(data.cargo_id);
-      setShowUploadModal(true);
+      // TODO: Upload documents from uploadedFiles
+      
       setSuccess(`Cargo ${data.cargo_id} registered successfully`);
+      
+      // Reset form
+      setShowUploadForm(false);
+      setUploadedFiles({});
+      setSelectedCargoId('');
+      setMilestoneCompletedAt('');
     } catch (e) {
       setError(String(e));
     } finally {
@@ -253,17 +267,73 @@ export function ImportCargoPage() {
           </div>
         </div>
 
-        <div className="flex justify-end pt-6">
-          <button
-            type="button"
-            onClick={() => void onSubmit()}
-            disabled={submitting}
-            className="px-5 py-2.5 rounded-md text-sm transition-colors duration-150 disabled:opacity-60"
-            style={{ backgroundColor: 'var(--gold-accent)', color: 'var(--navy-deep)', fontWeight: 600 }}
-          >
-            {submitting ? 'Saving…' : 'Register Cargo'}
-          </button>
-        </div>
+        {!showUploadForm ? (
+          <div className="flex justify-end pt-6">
+            <button
+              type="button"
+              onClick={onProceed}
+              className="px-5 py-2.5 rounded-md text-sm transition-colors duration-150"
+              style={{ backgroundColor: 'var(--gold-accent)', color: 'var(--navy-deep)', fontWeight: 600 }}
+            >
+              Proceed to Upload Documents
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="border-t pt-6 mt-6" style={{ borderColor: 'var(--border)' }}>
+              <h3 className="text-lg font-semibold mb-4">Upload Required Documents</h3>
+              <p className="text-sm opacity-60 mb-6">
+                {startingMilestone === 'DOCS_UPLOADED' 
+                  ? 'Upload the required documents for this cargo.'
+                  : 'Documents are marked as verified. You can upload them now or skip.'}
+              </p>
+              
+              <div className="space-y-4">
+                {requiredDocs.map((docType) => (
+                  <div key={docType} className="border rounded-md p-4" style={{ borderColor: 'var(--border)' }}>
+                    <div className="text-sm font-medium mb-2">{docType}</div>
+                    <input
+                      type="file"
+                      className="text-sm w-full"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setUploadedFiles(prev => ({ ...prev, [docType]: file }));
+                        }
+                      }}
+                    />
+                    {uploadedFiles[docType] && (
+                      <div className="text-xs opacity-60 mt-1">Selected: {uploadedFiles[docType].name}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end pt-6">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowUploadForm(false);
+                  setUploadedFiles({});
+                }}
+                className="px-5 py-2.5 rounded-md border text-sm"
+                style={{ borderColor: 'var(--border)' }}
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={() => void onSubmit()}
+                disabled={submitting}
+                className="px-5 py-2.5 rounded-md text-sm transition-colors duration-150 disabled:opacity-60"
+                style={{ backgroundColor: 'var(--gold-accent)', color: 'var(--navy-deep)', fontWeight: 600 }}
+              >
+                {submitting ? 'Saving…' : 'Register Cargo'}
+              </button>
+            </div>
+          </>
+        )}
 
         {error && (
           <div className="mt-4 p-3 rounded-md border border-red-300 bg-red-50 text-red-800 text-sm">{error}</div>
@@ -272,59 +342,6 @@ export function ImportCargoPage() {
           <div className="mt-4 p-3 rounded-md border border-green-300 bg-green-50 text-green-800 text-sm">{success}</div>
         )}
       </div>
-
-      {/* Document Upload Modal */}
-      {showUploadModal && registeredCargoId && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto mx-4">
-            <div className="p-6 border-b" style={{ borderColor: 'var(--border)' }}>
-              <h2 className="text-xl font-semibold">Upload Documents for {registeredCargoId}</h2>
-              <p className="text-sm opacity-60 mt-1">
-                {startingMilestone === 'DOCS_UPLOADED' 
-                  ? 'Upload the required documents below.'
-                  : 'Documents are marked as verified. You can upload them now or later.'}
-              </p>
-            </div>
-            
-            <div className="p-6">
-              <div className="space-y-4">
-                {requiredDocs.map((docType) => (
-                  <div key={docType} className="border rounded-md p-4" style={{ borderColor: 'var(--border)' }}>
-                    <div className="text-sm font-medium mb-2">{docType}</div>
-                    <input
-                      type="file"
-                      className="text-sm w-full"
-                    />
-                  </div>
-                ))}
-              </div>
-              
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={() => {
-                    setShowUploadModal(false);
-                    setRegisteredCargoId(null);
-                  }}
-                  className="flex-1 px-4 py-2.5 rounded-md border text-sm"
-                  style={{ borderColor: 'var(--border)' }}
-                >
-                  Skip for Now
-                </button>
-                <button
-                  onClick={() => {
-                    setShowUploadModal(false);
-                    setRegisteredCargoId(null);
-                  }}
-                  className="flex-1 px-4 py-2.5 rounded-md text-sm text-white"
-                  style={{ backgroundColor: 'var(--primary)' }}
-                >
-                  Done
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
