@@ -33,6 +33,10 @@ export function ImportCargoPage() {
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, File>>({});
   const [draggedOver, setDraggedOver] = useState<string | null>(null);
+  
+  const [showAssessmentForm, setShowAssessmentForm] = useState(false);
+  const [assessmentFile, setAssessmentFile] = useState<File | null>(null);
+  const [warehouseExitFile, setWarehouseExitFile] = useState<File | null>(null);
 
   const requiredDocs = useMemo(() => requiredDocsForCategory(category), [category]);
   const cargoIdPlaceholder = category ? `Enter cargo ID (${category})` : 'Enter cargo ID';
@@ -54,6 +58,10 @@ export function ImportCargoPage() {
       default:
         return 'Milestone Completed At (optional)';
     }
+  }, [startingMilestone]);
+  
+  const needsAssessment = useMemo(() => {
+    return ['DEPARTED_PORT', 'IN_ROUTE_RUSUMO', 'PHYSICAL_VERIFICATION', 'WAREHOUSE_ARRIVAL'].includes(startingMilestone);
   }, [startingMilestone]);
 
   useEffect(() => {
@@ -81,6 +89,34 @@ export function ImportCargoPage() {
     
     setShowUploadForm(true);
   };
+  
+  const onProceedToAssessment = () => {
+    setError(null);
+    setShowAssessmentForm(true);
+  };
+
+  const uploadFileToStorage = async (file: File, path: string): Promise<string> => {
+    // Get signed upload URL
+    const signedUrlRes = await fetchJson<{ signed_url: string }>(`/ops/storage/upload-url`, {
+      method: 'POST',
+      body: JSON.stringify({ path }),
+    });
+    
+    // Upload file to Supabase Storage using signed URL
+    const uploadRes = await fetch(signedUrlRes.signed_url, {
+      method: 'PUT',
+      body: file,
+      headers: {
+        'Content-Type': file.type,
+      },
+    });
+    
+    if (!uploadRes.ok) {
+      throw new Error(`Upload failed: ${await uploadRes.text()}`);
+    }
+    
+    return path;
+  };
 
   const onSubmit = async () => {
     setError(null);
@@ -92,7 +128,7 @@ export function ImportCargoPage() {
 
     setSubmitting(true);
     try {
-      // Use worker endpoint directly (already implemented)
+      // Register cargo first
       const data = await fetchJson<{ cargo_id: string }>(`/ops/cargo/register`, {
         method: 'POST',
         body: JSON.stringify({
@@ -104,13 +140,51 @@ export function ImportCargoPage() {
         }),
       });
       
-      // TODO: Upload documents from uploadedFiles
+      const cargoId = data.cargo_id;
       
-      setSuccess(`Cargo ${data.cargo_id} registered successfully`);
+      // Upload required documents
+      for (const [docType, file] of Object.entries(uploadedFiles)) {
+        const path = `cargo/${cargoId}/documents/${docType}/${file.name}`;
+        await uploadFileToStorage(file, path);
+        
+        // Update document record with file path
+        await fetchJson(`/ops/cargo/${cargoId}/documents/${docType}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ file_path: path, status: 'UPLOADED' }),
+        });
+      }
+      
+      // Upload assessment documents if needed
+      if (needsAssessment) {
+        if (assessmentFile) {
+          const path = `cargo/${cargoId}/approvals/assessment/${assessmentFile.name}`;
+          await uploadFileToStorage(assessmentFile, path);
+          
+          await fetchJson(`/ops/cargo/${cargoId}/approvals`, {
+            method: 'POST',
+            body: JSON.stringify({ kind: 'ASSESSMENT', file_path: path, notes: 'Draft assessment uploaded' }),
+          });
+        }
+        
+        if (warehouseExitFile) {
+          const path = `cargo/${cargoId}/approvals/exit-note/${warehouseExitFile.name}`;
+          await uploadFileToStorage(warehouseExitFile, path);
+          
+          await fetchJson(`/ops/cargo/${cargoId}/approvals`, {
+            method: 'POST',
+            body: JSON.stringify({ kind: 'EXIT_NOTE', file_path: path, notes: 'Warehouse exit note uploaded' }),
+          });
+        }
+      }
+      
+      setSuccess(`Cargo ${cargoId} registered successfully${needsAssessment ? ' with assessment documents' : ''}`);
       
       // Reset form
       setShowUploadForm(false);
+      setShowAssessmentForm(false);
       setUploadedFiles({});
+      setAssessmentFile(null);
+      setWarehouseExitFile(null);
       setSelectedCargoId('');
       setMilestoneCompletedAt('');
     } catch (e) {
@@ -399,28 +473,138 @@ export function ImportCargoPage() {
               </div>
             </div>
 
-            <div className="flex gap-3 justify-end pt-6">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowUploadForm(false);
-                  setUploadedFiles({});
-                }}
-                className="px-5 py-2.5 rounded-md border text-sm"
-                style={{ borderColor: 'var(--border)' }}
-              >
-                Back
-              </button>
-              <button
-                type="button"
-                onClick={() => void onSubmit()}
-                disabled={submitting}
-                className="px-5 py-2.5 rounded-md text-sm transition-colors duration-150 disabled:opacity-60"
-                style={{ backgroundColor: 'var(--gold-accent)', color: 'var(--navy-deep)', fontWeight: 600 }}
-              >
-                {submitting ? 'Saving…' : 'Register Cargo'}
-              </button>
-            </div>
+            {!showAssessmentForm ? (
+              <div className="flex gap-3 justify-end pt-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUploadForm(false);
+                    setUploadedFiles({});
+                  }}
+                  className="px-5 py-2.5 rounded-md border text-sm"
+                  style={{ borderColor: 'var(--border)' }}
+                >
+                  Back
+                </button>
+                {needsAssessment ? (
+                  <button
+                    type="button"
+                    onClick={onProceedToAssessment}
+                    className="px-5 py-2.5 rounded-md text-sm transition-colors duration-150"
+                    style={{ backgroundColor: 'var(--gold-accent)', color: 'var(--navy-deep)', fontWeight: 600 }}
+                  >
+                    Next: Assessment and Exit Note
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void onSubmit()}
+                    disabled={submitting}
+                    className="px-5 py-2.5 rounded-md text-sm transition-colors duration-150 disabled:opacity-60"
+                    style={{ backgroundColor: 'var(--gold-accent)', color: 'var(--navy-deep)', fontWeight: 600 }}
+                  >
+                    {submitting ? 'Saving…' : 'Register Cargo'}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="border-t pt-6" style={{ borderColor: 'var(--border)' }}>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-semibold">Draft Assessment and Warehouse Exit Note</h3>
+                      <p className="text-sm opacity-60 mt-1">Upload the required documents for customs clearance.</p>
+                    </div>
+                    <div className="text-sm font-medium px-4 py-2 rounded-lg" style={{ backgroundColor: 'var(--gold-accent)', color: 'var(--navy-deep)' }}>
+                      {(assessmentFile ? 1 : 0) + (warehouseExitFile ? 1 : 0)} / 2 files
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="border rounded-lg p-5" style={{ borderColor: assessmentFile ? 'var(--gold-accent)' : 'var(--border)', backgroundColor: assessmentFile ? 'rgba(212, 175, 55, 0.05)' : 'transparent' }}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <File className="w-4 h-4 opacity-60" />
+                          <span className="text-sm font-medium">Draft Assessment</span>
+                        </div>
+                        {assessmentFile && <CheckCircle2 className="w-5 h-5 text-green-600" />}
+                      </div>
+                      <label className="block cursor-pointer">
+                        <div className="border-2 border-dashed rounded-lg p-6 text-center transition-all hover:border-opacity-60" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)' }}>
+                          {assessmentFile ? (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-center gap-2 text-sm font-medium" style={{ color: 'var(--gold-accent)' }}>
+                                <File className="w-5 h-5" />
+                                <span>{assessmentFile.name}</span>
+                              </div>
+                              <div className="text-xs opacity-60">{(assessmentFile.size / 1024).toFixed(1)} KB</div>
+                              <button type="button" onClick={(e) => { e.preventDefault(); setAssessmentFile(null); }} className="text-xs text-red-600 hover:text-red-700 underline mt-2">Remove</button>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <Upload className="w-8 h-8 mx-auto opacity-40" />
+                              <div className="text-sm font-medium opacity-70">Click to upload draft assessment</div>
+                              <div className="text-xs opacity-50">PDF, DOC, DOCX (max 10MB)</div>
+                            </div>
+                          )}
+                        </div>
+                        <input type="file" className="hidden" accept=".pdf,.doc,.docx" onChange={(e) => setAssessmentFile(e.target.files?.[0] || null)} />
+                      </label>
+                    </div>
+
+                    <div className="border rounded-lg p-5" style={{ borderColor: warehouseExitFile ? 'var(--gold-accent)' : 'var(--border)', backgroundColor: warehouseExitFile ? 'rgba(212, 175, 55, 0.05)' : 'transparent' }}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <File className="w-4 h-4 opacity-60" />
+                          <span className="text-sm font-medium">Warehouse Exit Note</span>
+                        </div>
+                        {warehouseExitFile && <CheckCircle2 className="w-5 h-5 text-green-600" />}
+                      </div>
+                      <label className="block cursor-pointer">
+                        <div className="border-2 border-dashed rounded-lg p-6 text-center transition-all hover:border-opacity-60" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)' }}>
+                          {warehouseExitFile ? (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-center gap-2 text-sm font-medium" style={{ color: 'var(--gold-accent)' }}>
+                                <File className="w-5 h-5" />
+                                <span>{warehouseExitFile.name}</span>
+                              </div>
+                              <div className="text-xs opacity-60">{(warehouseExitFile.size / 1024).toFixed(1)} KB</div>
+                              <button type="button" onClick={(e) => { e.preventDefault(); setWarehouseExitFile(null); }} className="text-xs text-red-600 hover:text-red-700 underline mt-2">Remove</button>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <Upload className="w-8 h-8 mx-auto opacity-40" />
+                              <div className="text-sm font-medium opacity-70">Click to upload warehouse exit note</div>
+                              <div className="text-xs opacity-50">PDF, DOC, DOCX (max 10MB)</div>
+                            </div>
+                          )}
+                        </div>
+                        <input type="file" className="hidden" accept=".pdf,.doc,.docx" onChange={(e) => setWarehouseExitFile(e.target.files?.[0] || null)} />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-3 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowAssessmentForm(false)}
+                    className="px-5 py-2.5 rounded-md border text-sm"
+                    style={{ borderColor: 'var(--border)' }}
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void onSubmit()}
+                    disabled={submitting}
+                    className="px-5 py-2.5 rounded-md text-sm transition-colors duration-150 disabled:opacity-60"
+                    style={{ backgroundColor: 'var(--gold-accent)', color: 'var(--navy-deep)', fontWeight: 600 }}
+                  >
+                    {submitting ? 'Saving…' : 'Register Cargo'}
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
 
