@@ -206,7 +206,7 @@ export function ImportCargoPage() {
           { file: wh7File, docType: 'WH7' },
           { file: assessmentFile, docType: 'ASSESSMENT' },
           { file: draftFile, docType: 'DRAFT_DECLARATION' },
-          { file: t1File, docType: 'T1' },
+          { file: t1File, docType: 'T1_FORM' },
           { file: exitNoteFile, docType: 'EXIT_NOTE' },
         ];
         
