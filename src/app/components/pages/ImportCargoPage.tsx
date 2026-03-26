@@ -218,7 +218,7 @@ export function ImportCargoPage() {
             // Update or create document record
             await fetchJson(`/ops/cargo/${cargoId}/documents/${doc.docType}`, {
               method: 'PATCH',
-              body: JSON.stringify({ provider_path: path, status: 'UPLOADED' }),
+              body: JSON.stringify({ provider_path: path, status: 'VERIFIED' }),
             });
           }
         }
