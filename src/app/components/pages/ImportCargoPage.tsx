@@ -264,7 +264,7 @@ export function ImportCargoPage() {
       
       // Parse error for user-friendly messages
       if (errorMsg.includes('already_exists') || errorMsg.includes('409')) {
-        setError(`Cargo "${selectedCargoId}" already exists in the system. Please check the cargo list or use a different ID.`);
+        setError(`Cargo "${selectedCargoId}" already exists in the system. To upload documents or update its status, open it from the cargo list instead.`);
       } else if (errorMsg.includes('signed_upload_failed')) {
         setError('File upload failed. Please check your internet connection and try again.');
       } else if (errorMsg.includes('missing_field')) {
