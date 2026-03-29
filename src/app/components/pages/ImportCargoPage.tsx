@@ -33,6 +33,7 @@ export function ImportCargoPage() {
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, File>>({});
   const [notAvailableDocs, setNotAvailableDocs] = useState<Record<string, boolean>>({});
+  const [notAvailableCustomsDocs, setNotAvailableCustomsDocs] = useState<Record<string, boolean>>({});
   const [draggedOver, setDraggedOver] = useState<string | null>(null);
   
   const [showAssessmentForm, setShowAssessmentForm] = useState(false);
@@ -219,9 +220,18 @@ export function ImportCargoPage() {
           { file: t1File, docType: 'T1' },
           { file: exitNoteFile, docType: 'EXIT_NOTE' },
         ];
+
+        // Mark not-available customs docs
+        for (const docType of Object.keys(notAvailableCustomsDocs).filter(k => notAvailableCustomsDocs[k])) {
+          console.log(`[REGISTER] Marking customs document as NOT_AVAILABLE: ${docType}`);
+          await fetchJson(`/ops/cargo/${cargoId}/documents/${docType}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ provider_path: '_not_available_', status: 'NOT_AVAILABLE', import_mode: false }),
+          });
+        }
         
         for (const doc of customsDocs) {
-          if (doc.file) {
+          if (doc.file && !notAvailableCustomsDocs[doc.docType]) {
             const path = `cargo/${cargoId}/documents/${doc.docType}/${doc.file.name}`;
             await uploadFileToStorage(doc.file, path);
             
@@ -241,6 +251,7 @@ export function ImportCargoPage() {
       setShowAssessmentForm(false);
       setUploadedFiles({});
       setNotAvailableDocs({});
+      setNotAvailableCustomsDocs({});
       setWh7File(null);
       setAssessmentFile(null);
       setDraftFile(null);
@@ -636,28 +647,109 @@ export function ImportCargoPage() {
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <h3 className="text-lg font-semibold">Customs Clearance Documents</h3>
-                      <p className="text-sm opacity-60 mt-1">Upload WH7, Assessment, Draft, T1, and Exit Note documents.</p>
+                      <p className="text-sm opacity-60 mt-1">Upload WH7, Assessment, Draft, T1, and Exit Note documents. Mark as Not Available if a document doesn't exist.</p>
                     </div>
                     <div className="text-sm font-medium px-4 py-2 rounded-lg" style={{ backgroundColor: 'var(--gold-accent)', color: 'var(--navy-deep)' }}>
-                      {(wh7File ? 1 : 0) + (assessmentFile ? 1 : 0) + (draftFile ? 1 : 0) + (t1File ? 1 : 0) + (exitNoteFile ? 1 : 0)} / 5 files
+                      {[
+                        wh7File || notAvailableCustomsDocs['WH7'],
+                        assessmentFile || notAvailableCustomsDocs['ASSESSMENT'],
+                        draftFile || notAvailableCustomsDocs['DRAFT_DECLARATION'],
+                        t1File || notAvailableCustomsDocs['T1'],
+                        exitNoteFile || notAvailableCustomsDocs['EXIT_NOTE'],
+                      ].filter(Boolean).length} / 5 handled
                     </div>
                   </div>
-                  
+
                   <div className="space-y-4">
-                    {/* WH7 */}
-                    {renderFileUpload('WH7', wh7File, setWh7File)}
-                    
-                    {/* Assessment */}
-                    {renderFileUpload('Assessment', assessmentFile, setAssessmentFile)}
-                    
-                    {/* Draft */}
-                    {renderFileUpload('Draft', draftFile, setDraftFile)}
-                    
-                    {/* T1 */}
-                    {renderFileUpload('T1', t1File, setT1File)}
-                    
-                    {/* Exit Note */}
-                    {renderFileUpload('Exit Note', exitNoteFile, setExitNoteFile)}
+                    {([
+                      { label: 'WH7', docType: 'WH7', file: wh7File, setFile: setWh7File },
+                      { label: 'Assessment', docType: 'ASSESSMENT', file: assessmentFile, setFile: setAssessmentFile },
+                      { label: 'Draft Declaration', docType: 'DRAFT_DECLARATION', file: draftFile, setFile: setDraftFile },
+                      { label: 'T1', docType: 'T1', file: t1File, setFile: setT1File },
+                      { label: 'Exit Note', docType: 'EXIT_NOTE', file: exitNoteFile, setFile: setExitNoteFile },
+                    ] as { label: string; docType: string; file: File | null; setFile: (f: File | null) => void }[]).map(({ label, docType, file, setFile }) => {
+                      const isNotAvailable = notAvailableCustomsDocs[docType] === true;
+                      const borderColor = isNotAvailable ? 'rgb(239,68,68)' : file ? 'var(--gold-accent)' : 'var(--border)';
+                      const bgColor = isNotAvailable ? 'rgba(239,68,68,0.05)' : file ? 'rgba(212,175,55,0.05)' : 'transparent';
+                      return (
+                        <div key={docType} className="border rounded-lg p-5 transition-all" style={{ borderColor, backgroundColor: bgColor }}>
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <File className="w-4 h-4 opacity-60" />
+                              <span className="text-sm font-medium">{label}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {isNotAvailable && (
+                                <span className="text-xs px-2 py-0.5 rounded-md font-medium" style={{ backgroundColor: 'rgba(239,68,68,0.15)', color: 'rgb(239,68,68)' }}>
+                                  Not Available
+                                </span>
+                              )}
+                              {file && !isNotAvailable && (
+                                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (isNotAvailable) {
+                                    setNotAvailableCustomsDocs(prev => { const n = { ...prev }; delete n[docType]; return n; });
+                                  } else {
+                                    setNotAvailableCustomsDocs(prev => ({ ...prev, [docType]: true }));
+                                    setFile(null);
+                                  }
+                                }}
+                                className="text-xs px-2 py-1 rounded-md border transition-colors"
+                                style={{
+                                  borderColor: isNotAvailable ? 'rgb(239,68,68)' : 'var(--border)',
+                                  color: isNotAvailable ? 'rgb(239,68,68)' : 'inherit',
+                                  opacity: 0.8,
+                                }}
+                              >
+                                {isNotAvailable ? 'Undo' : 'Not Available'}
+                              </button>
+                            </div>
+                          </div>
+
+                          {isNotAvailable ? (
+                            <div className="border-2 border-dashed rounded-lg p-4 text-center" style={{ borderColor: 'rgb(239,68,68)', backgroundColor: 'rgba(239,68,68,0.04)' }}>
+                              <div className="text-sm opacity-70">This document is marked as not available and will be visible to the client.</div>
+                            </div>
+                          ) : (
+                            <label className="block cursor-pointer">
+                              <div className="border-2 border-dashed rounded-lg p-6 text-center transition-all hover:border-opacity-60" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)' }}>
+                                {file ? (
+                                  <div className="space-y-2">
+                                    <div className="flex items-center justify-center gap-2 text-sm font-medium" style={{ color: 'var(--gold-accent)' }}>
+                                      <File className="w-5 h-5" />
+                                      <span>{file.name}</span>
+                                    </div>
+                                    <div className="text-xs opacity-60">{(file.size / 1024).toFixed(1)} KB</div>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.preventDefault(); setFile(null); }}
+                                      className="text-xs text-red-600 hover:text-red-700 underline mt-2"
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2">
+                                    <Upload className="w-8 h-8 mx-auto opacity-40" />
+                                    <div className="text-sm font-medium opacity-70">Click to upload or drag and drop</div>
+                                    <div className="text-xs opacity-50">PDF, DOC, DOCX, JPG, PNG (max 10MB)</div>
+                                  </div>
+                                )}
+                              </div>
+                              <input
+                                type="file"
+                                className="hidden"
+                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                onChange={(e) => { const f = e.target.files?.[0]; if (f) setFile(f); }}
+                              />
+                            </label>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
                 <div className="flex gap-3 justify-end">
