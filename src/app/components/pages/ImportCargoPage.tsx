@@ -172,7 +172,7 @@ export function ImportCargoPage() {
 
     setSubmitting(true);
     try {
-      // Register cargo first
+      // Register cargo first (pass not-available docs so they're inserted correctly)
       const data = await fetchJson<{ cargo_id: string; container_id: string }>(`/ops/cargo/register`, {
         method: 'POST',
         body: JSON.stringify({
@@ -181,20 +181,13 @@ export function ImportCargoPage() {
           category,
           milestone_completed_at: milestoneCompletedAt ? new Date(milestoneCompletedAt).toISOString() : null,
           starting_milestone: startingMilestone,
+          not_available_docs: Object.keys(notAvailableDocs).filter(k => notAvailableDocs[k]),
+          not_available_customs_docs: Object.keys(notAvailableCustomsDocs).filter(k => notAvailableCustomsDocs[k]),
         }),
       });
       
       const cargoId = data.container_id; // Use container_id (user input) not UUID
       console.log(`[REGISTER] Cargo registered: ${cargoId} (UUID: ${data.cargo_id})`);
-      
-      // Mark not-available documents
-      for (const docType of Object.keys(notAvailableDocs).filter(k => notAvailableDocs[k])) {
-        console.log(`[REGISTER] Marking document as NOT_AVAILABLE: ${docType}`);
-        await fetchJson(`/ops/cargo/${cargoId}/documents/${docType}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ provider_path: '_not_available_', status: 'NOT_AVAILABLE', import_mode: false }),
-        });
-      }
 
       // Upload required documents
       console.log(`[REGISTER] Uploading ${Object.keys(uploadedFiles).length} required documents...`);
@@ -221,15 +214,6 @@ export function ImportCargoPage() {
           { file: exitNoteFile, docType: 'EXIT_NOTE' },
         ];
 
-        // Mark not-available customs docs
-        for (const docType of Object.keys(notAvailableCustomsDocs).filter(k => notAvailableCustomsDocs[k])) {
-          console.log(`[REGISTER] Marking customs document as NOT_AVAILABLE: ${docType}`);
-          await fetchJson(`/ops/cargo/${cargoId}/documents/${docType}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ provider_path: '_not_available_', status: 'NOT_AVAILABLE', import_mode: false }),
-          });
-        }
-        
         for (const doc of customsDocs) {
           if (doc.file && !notAvailableCustomsDocs[doc.docType]) {
             const path = `cargo/${cargoId}/documents/${doc.docType}/${doc.file.name}`;
