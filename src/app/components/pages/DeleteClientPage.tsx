@@ -5,8 +5,8 @@ import { fetchJson } from '@/app/api/ops';
 
 interface Client {
   id: string;
-  company_name: string;
-  subdomain?: string;
+  name: string;
+  slug?: string;
 }
 
 interface DeleteClientPageProps {
@@ -24,8 +24,8 @@ export function DeleteClientPage({ onDeleted, onCancel }: DeleteClientPageProps)
 
   // Load client list
   useEffect(() => {
-    fetchJson<{ tenants: Client[] }>('/admin/clients')
-      .then((res) => setClients(res.tenants ?? []))
+    fetchJson<{ clients: Client[] }>('/ops/clients')
+      .then((res) => setClients(res.clients ?? []))
       .catch((e) => setError(String(e)))
       .finally(() => setLoadingClients(false));
   }, []);
@@ -44,8 +44,8 @@ export function DeleteClientPage({ onDeleted, onCancel }: DeleteClientPageProps)
       setError('Selected client not found.');
       return;
     }
-    if (confirmName.trim().toLowerCase() !== selectedClient.company_name.trim().toLowerCase()) {
-      setError(`Type the client name exactly to confirm: "${selectedClient.company_name}"`);
+    if (confirmName.trim().toLowerCase() !== selectedClient.name.trim().toLowerCase()) {
+      setError(`Type the client name exactly to confirm: "${selectedClient.name}"`);
       return;
     }
 
@@ -107,7 +107,7 @@ export function DeleteClientPage({ onDeleted, onCancel }: DeleteClientPageProps)
                 <option value="">— Choose a client —</option>
                 {clients.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.company_name}{c.subdomain ? ` (${c.subdomain})` : ''}
+                    {c.name}{c.slug ? ` (${c.slug})` : ''}
                   </option>
                 ))}
               </select>
@@ -118,14 +118,14 @@ export function DeleteClientPage({ onDeleted, onCancel }: DeleteClientPageProps)
           {selectedClient && (
             <div>
               <label className="block text-sm opacity-70 mb-1">
-                Type <strong>{selectedClient.company_name}</strong> to confirm deletion
+                Type <strong>{selectedClient.name}</strong> to confirm deletion
               </label>
               <input
                 value={confirmName}
                 onChange={(e) => setConfirmName(e.target.value)}
                 className="w-full px-3 py-2 rounded border bg-transparent"
                 style={{ borderColor: 'rgba(239,68,68,0.5)' }}
-                placeholder={selectedClient.company_name}
+                placeholder={selectedClient.name}
                 autoComplete="off"
               />
             </div>
@@ -141,7 +141,7 @@ export function DeleteClientPage({ onDeleted, onCancel }: DeleteClientPageProps)
               Cancel
             </button>
             <button
-              disabled={submitting || !selectedId || confirmName.trim().toLowerCase() !== (selectedClient?.company_name ?? '').trim().toLowerCase()}
+              disabled={submitting || !selectedId || confirmName.trim().toLowerCase() !== (selectedClient?.name ?? '').trim().toLowerCase()}
               type="submit"
               className="px-4 py-2 rounded border flex items-center gap-2 disabled:opacity-40"
               style={{ borderColor: 'rgb(239,68,68)', color: 'rgb(239,68,68)' }}
