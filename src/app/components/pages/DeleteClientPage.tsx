@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { AlertTriangle, Trash2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { AlertTriangle, CheckCircle, Trash2 } from 'lucide-react';
 import { deleteOpsClient, getOpsClients } from '@/app/api/ops';
 
 interface Client {
@@ -19,7 +19,9 @@ export function DeleteClientPage({ onDeleted, onCancel }: DeleteClientPageProps)
   const [confirmName, setConfirmName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [loadingClients, setLoadingClients] = useState(true);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load client list
   useEffect(() => {
@@ -49,13 +51,16 @@ export function DeleteClientPage({ onDeleted, onCancel }: DeleteClientPageProps)
     }
 
     setSubmitting(true);
+    const deletedName = selectedClient.name;
     try {
       await deleteOpsClient(selectedId);
-      // Remove from dropdown immediately
+      // Remove from dropdown immediately — before navigation
       setClients((prev) => prev.filter((c) => c.id !== selectedId));
       setSelectedId('');
       setConfirmName('');
-      onDeleted();
+      setSuccessMsg(`"${deletedName}" and all their cargo have been permanently deleted.`);
+      // Navigate back after 2 seconds so user sees the updated dropdown
+      timerRef.current = setTimeout(() => onDeleted(), 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -86,8 +91,14 @@ export function DeleteClientPage({ onDeleted, onCancel }: DeleteClientPageProps)
       <div className="bg-card rounded-lg border" style={{ borderColor: 'var(--border)' }}>
         <form onSubmit={handleDelete} className="p-6 space-y-4">
           {error && (
-            <div className="text-sm" style={{ color: 'var(--destructive)' }}>
+            <div className="text-sm rounded px-3 py-2" style={{ color: 'var(--destructive)', backgroundColor: 'rgba(212,24,61,0.07)', border: '1px solid rgba(212,24,61,0.2)' }}>
               {error}
+            </div>
+          )}
+          {successMsg && (
+            <div className="flex items-start gap-2 text-sm rounded px-3 py-2" style={{ color: '#10b981', backgroundColor: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.2)' }}>
+              <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{successMsg} Redirecting…</span>
             </div>
           )}
 
