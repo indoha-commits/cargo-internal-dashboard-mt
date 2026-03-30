@@ -14,6 +14,7 @@ import { ImportCargoPage } from '@/app/components/pages/ImportCargoPage';
 import { CargoTimelinePage } from '@/app/components/pages/CargoTimelinePage';
 import { CargoRegistryPage } from '@/app/components/pages/CargoRegistryPage';
 import { CreateClientPage } from '@/app/components/pages/CreateClientPage';
+import { DeleteClientPage } from '@/app/components/pages/DeleteClientPage';
 import { ActivityLogPage } from '@/app/components/pages/ActivityLogPage';
 import { OperationsUpdatePage } from '@/app/components/pages/OperationsUpdatePage';
 import { fetchJson } from '@/app/api/client';
@@ -28,6 +29,7 @@ type OpsPageId =
   | 'cargo-timeline'
   | 'cargo-registry'
   | 'create-client'
+  | 'delete-client'
   | 'activity-log';
 
 const pageToPath: Record<OpsPageId, string> = {
@@ -40,6 +42,7 @@ const pageToPath: Record<OpsPageId, string> = {
   'cargo-timeline': 'cargo-timeline',
   'cargo-registry': 'cargo-registry',
   'create-client': 'create-client',
+  'delete-client': 'delete-client',
   'activity-log': 'activity-log',
 };
 
@@ -53,6 +56,7 @@ const pathToPage: Record<string, OpsPageId> = {
   'cargo-timeline': 'cargo-timeline',
   'cargo-registry': 'cargo-registry',
   'create-client': 'create-client',
+  'delete-client': 'delete-client',
   'activity-log': 'activity-log',
 };
 
@@ -127,6 +131,13 @@ function OpsPageRenderer({
             setNewlyCreatedClient(client);
             setCurrentPage('cargo-registry');
           }}
+        />
+      );
+    case 'delete-client':
+      return (
+        <DeleteClientPage
+          onCancel={() => setCurrentPage('cargo-registry')}
+          onDeleted={() => setCurrentPage('cargo-registry')}
         />
       );
     case 'activity-log':

@@ -288,6 +288,12 @@ export type OpsCreateClientResponse = {
   user: { id: string; email: string };
 };
 
+export async function deleteOpsClient(tenantId: string): Promise<{ ok: true }> {
+  return await fetchJson<{ ok: true }>(`/admin/clients/${encodeURIComponent(tenantId)}`, {
+    method: 'DELETE',
+  });
+}
+
 export async function createOpsClient(payload: OpsCreateClientRequest): Promise<OpsCreateClientResponse> {
   return await fetchJson<OpsCreateClientResponse>('/ops/clients', {
     method: 'POST',
