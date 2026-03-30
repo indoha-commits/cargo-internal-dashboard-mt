@@ -51,6 +51,10 @@ export function DeleteClientPage({ onDeleted, onCancel }: DeleteClientPageProps)
     setSubmitting(true);
     try {
       await deleteOpsClient(selectedId);
+      // Remove from dropdown immediately
+      setClients((prev) => prev.filter((c) => c.id !== selectedId));
+      setSelectedId('');
+      setConfirmName('');
       onDeleted();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
