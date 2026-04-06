@@ -88,6 +88,7 @@ export function CargoRegistryPage({
     expected_arrival_date: string;
     container_count: number;
     category: CargoCategory;
+    clearance_pathway: 'PORT_CLEARANCE' | 'T1_TRANSIT';
     destination: string;
     origin: string;
   }>({
@@ -96,6 +97,7 @@ export function CargoRegistryPage({
     expected_arrival_date: '',
     container_count: 1,
     category: 'ELECTRONICS',
+    clearance_pathway: 'PORT_CLEARANCE',
     destination: '',
     origin: '',
   });
@@ -106,6 +108,7 @@ export function CargoRegistryPage({
     expected_arrival_date: string;
     container_count: number;
     category: CargoCategory;
+    clearance_pathway: 'PORT_CLEARANCE' | 'T1_TRANSIT';
     destination: string;
     origin: string;
   }>({
@@ -114,6 +117,7 @@ export function CargoRegistryPage({
     expected_arrival_date: '',
     container_count: 1,
     category: 'ELECTRONICS',
+    clearance_pathway: 'PORT_CLEARANCE',
     destination: '',
     origin: '',
   });
@@ -362,6 +366,7 @@ export function CargoRegistryPage({
         expected_arrival_date: '',
         container_count: 1,
         category: 'ELECTRONICS',
+        clearance_pathway: 'PORT_CLEARANCE',
         destination: '',
         origin: '',
       });
@@ -410,6 +415,7 @@ export function CargoRegistryPage({
         expected_arrival_date: '',
         container_count: 1,
         category: 'ELECTRONICS',
+        clearance_pathway: 'PORT_CLEARANCE',
         destination: '',
         origin: '',
       });
@@ -857,6 +863,24 @@ export function CargoRegistryPage({
               </div>
 
               <div>
+                <label className="block text-sm opacity-70 mb-1">Tax Payment Method</label>
+                <select
+                  value={form.clearance_pathway}
+                  onChange={(e) => setForm((f) => ({ ...f, clearance_pathway: e.target.value as any }))}
+                  className="w-full px-3 py-2 rounded border bg-background text-foreground"
+                  style={{ borderColor: 'var(--border)' }}
+                >
+                  <option value="PORT_CLEARANCE">Port Clearance (Pay Tax at Port)</option>
+                  <option value="T1_TRANSIT">T1 Transit (Pay Tax After Transport)</option>
+                </select>
+                <p className="text-xs opacity-60 mt-1">
+                  {form.clearance_pathway === 'PORT_CLEARANCE' 
+                    ? 'Requires: Draft, Assessment, Exit Note' 
+                    : 'Requires: T1 Form, IM8 Form, Exit Note'}
+                </p>
+              </div>
+
+              <div>
                 <label className="block text-sm opacity-70 mb-1">Container ID</label>
                 <input
                   value={form.container_id}
@@ -1027,6 +1051,24 @@ export function CargoRegistryPage({
                     Example: 5 will create GROUP123-001 to GROUP123-005
                   </div>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm opacity-70 mb-1">Tax Payment Method</label>
+                <select
+                  value={bulkForm.clearance_pathway}
+                  onChange={(e) => setBulkForm((f) => ({ ...f, clearance_pathway: e.target.value as any }))}
+                  className="w-full px-3 py-2 rounded border bg-background text-foreground"
+                  style={{ borderColor: 'var(--border)' }}
+                >
+                  <option value="PORT_CLEARANCE">Port Clearance (Pay Tax at Port)</option>
+                  <option value="T1_TRANSIT">T1 Transit (Pay Tax After Transport)</option>
+                </select>
+                <p className="text-xs opacity-60 mt-1">
+                  {bulkForm.clearance_pathway === 'PORT_CLEARANCE' 
+                    ? 'Requires: Draft, Assessment, Exit Note' 
+                    : 'Requires: T1 Form, IM8 Form, Exit Note'}
+                </p>
               </div>
 
               <div>
