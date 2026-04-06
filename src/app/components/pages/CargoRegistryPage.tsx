@@ -491,17 +491,17 @@ export function CargoRegistryPage({
         <div className="text-sm opacity-60 sm:whitespace-nowrap">{totalCargos} containers • {grouped.length} groups</div>
       </div>
 
-      <div className="bg-card rounded-lg border" style={{ borderColor: 'var(--border)' }}>
+      <div className="bg-card rounded-lg border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
         {loading ? (
-          <div className="px-6 py-8 text-sm opacity-60">Loading…</div>
+          <div className="px-4 sm:px-6 py-8 text-sm opacity-60">Loading…</div>
         ) : error ? (
-          <div className="px-6 py-8 text-sm" style={{ color: 'var(--destructive)' }}>
+          <div className="px-4 sm:px-6 py-8 text-sm" style={{ color: 'var(--destructive)' }}>
             {error}
           </div>
         ) : grouped.length === 0 ? (
-          <div className="px-6 py-8 text-sm opacity-60">No cargos found.</div>
+          <div className="px-4 sm:px-6 py-8 text-sm opacity-60">No cargos found.</div>
         ) : (
-          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+          <div className="divide-y overflow-x-auto" style={{ borderColor: 'var(--border)' }}>
             {grouped.map((group) => {
               const open = expandedGroups.has(group.billOfLading);
 
@@ -509,21 +509,21 @@ export function CargoRegistryPage({
                 <div key={group.billOfLading}>
                   <button
                     onClick={() => toggleGroup(group.billOfLading)}
-                    className="w-full px-6 py-4 flex items-center justify-between hover:bg-muted/20 transition-colors"
+                    className="w-full px-4 sm:px-6 py-4 flex items-center justify-between hover:bg-muted/20 transition-colors"
                   >
-                    <div className="text-left">
-                      <div className="text-sm" style={{ fontWeight: 600 }}>
+                    <div className="text-left min-w-0 flex-1">
+                      <div className="text-sm truncate" style={{ fontWeight: 600 }}>
                         {group.billOfLading}
                       </div>
-                      <div className="text-xs opacity-60 mt-1">
+                      <div className="text-xs opacity-60 mt-1 truncate">
                         {group.clientName} • {group.cargos.length} containers
                       </div>
                     </div>
-                    <div className="text-sm opacity-60">{open ? '−' : '+'}</div>
+                    <div className="text-sm opacity-60 ml-4 flex-shrink-0">{open ? '−' : '+'}</div>
                   </button>
 
                   {open && (
-                    <div className="px-6 pb-4">
+                    <div className="px-4 sm:px-6 pb-4">
                       {/* Mobile: card list */}
                       <div className="sm:hidden space-y-3">
                         {group.cargos.map((c) => (
