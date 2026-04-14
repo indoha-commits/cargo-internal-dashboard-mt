@@ -46,9 +46,10 @@ export function ImportCargoPage() {
   const [showAssessmentForm, setShowAssessmentForm] = useState(false);
   const [customsFilesByContainer, setCustomsFilesByContainer] = useState<Record<string, Record<string, File>>>({});
   const [notAvailableCustomsByContainer, setNotAvailableCustomsByContainer] = useState<Record<string, Record<string, boolean>>>({});
+  const [imDocTypeByContainer, setImDocTypeByContainer] = useState<Record<string, 'IM8' | 'IM7'>>({});
 
   const requiredDocs = useMemo(() => requiredDocsForCategory(category), [category]);
-  const customsDocTypes = useMemo(() => ['WH7', 'ASSESSMENT', 'DRAFT_DECLARATION', 'EXIT_NOTE', 'IM4', 'T1'], []);
+  const customsBaseDocTypes = useMemo(() => ['WH7', 'ASSESSMENT', 'DRAFT_DECLARATION', 'EXIT_NOTE', 'T1'], []);
   const previewContainerIds = useMemo(() => {
     if (!isGroupImport) return selectedCargoId.trim() ? [selectedCargoId.trim()] : [];
     const bol = selectedCargoId.trim();
@@ -72,6 +73,7 @@ export function ImportCargoPage() {
     });
     setCustomsFile(containerId, docType, null);
   };
+  const selectedImDocType = (containerId: string): 'IM8' | 'IM7' => imDocTypeByContainer[containerId] ?? 'IM8';
   const cargoIdPlaceholder = category ? `Enter cargo ID (${category})` : 'Enter cargo ID';
   
   const milestoneDateLabel = useMemo(() => {
@@ -116,6 +118,11 @@ export function ImportCargoPage() {
     setContainerMilestoneOverrides((prev) => {
       const next: Record<string, StartingMilestone> = {};
       for (const id of previewContainerIds) next[id] = prev[id] ?? startingMilestone;
+      return next;
+    });
+    setImDocTypeByContainer((prev) => {
+      const next: Record<string, 'IM8' | 'IM7'> = {};
+      for (const id of previewContainerIds) next[id] = prev[id] ?? 'IM8';
       return next;
     });
   }, [isGroupImport, previewContainerIds, startingMilestone]);
@@ -293,7 +300,8 @@ export function ImportCargoPage() {
           const useShared = useSharedMilestoneByContainer[cargoId] ?? true;
           const containerMilestone = useShared ? startingMilestone : (containerMilestoneOverrides[cargoId] ?? startingMilestone);
           if (!milestoneNeedsCustoms(containerMilestone)) continue;
-          for (const docType of customsDocTypes) {
+          const containerCustomsDocTypes = [...customsBaseDocTypes, selectedImDocType(cargoId)];
+          for (const docType of containerCustomsDocTypes) {
             const file = containerFiles[docType];
             if (file && !containerNotAvailable[docType]) {
               const path = `cargo/${cargoId}/documents/${docType}/${file.name}`;
@@ -321,6 +329,7 @@ export function ImportCargoPage() {
       setNotAvailableCustomsByContainer({});
       setUseSharedMilestoneByContainer({});
       setContainerMilestoneOverrides({});
+      setImDocTypeByContainer({});
       setSelectedCargoId('');
       setMilestoneCompletedAt('');
       setContainerCount(2);
@@ -849,20 +858,23 @@ export function ImportCargoPage() {
                     {previewContainerIds.map((containerId) => {
                       const containerFiles = customsFilesByContainer[containerId] ?? {};
                       const containerNA = notAvailableCustomsByContainer[containerId] ?? {};
-                      const handledCount = customsDocTypes.filter((docType) => Boolean(containerFiles[docType]) || containerNA[docType]).length;
+                      const activeDocTypes = [...customsBaseDocTypes, selectedImDocType(containerId)];
+                      const handledCount = activeDocTypes.filter((docType) => Boolean(containerFiles[docType]) || containerNA[docType]).length;
                       return (
                         <div key={containerId} className="border rounded-lg p-5" style={{ borderColor: 'var(--border)' }}>
                           <div className="flex items-center justify-between mb-3">
                             <div className="text-sm font-mono" style={{ color: 'var(--primary)' }}>{containerId}</div>
-                            <div className="text-xs opacity-60">{handledCount} / {customsDocTypes.length} handled</div>
+                            <div className="text-xs opacity-60">{handledCount} / {customsBaseDocTypes.length + 1} handled</div>
                           </div>
                           <div className="space-y-4">
-                            {customsDocTypes.map((docType) => {
+                            {activeDocTypes.map((docType) => {
                               const label =
                                 docType === 'DRAFT_DECLARATION'
                                   ? 'Draft Declaration'
-                                  : docType === 'IM4'
-                                    ? 'IM4 Document'
+                                  : docType === 'IM8'
+                                    ? 'IM8 Document'
+                                    : docType === 'IM7'
+                                      ? 'IM7 Document'
                                     : docType;
                               const file = containerFiles[docType] ?? null;
                               const isNotAvailable = containerNA[docType] === true;
@@ -874,6 +886,54 @@ export function ImportCargoPage() {
                             <div className="flex items-center gap-2">
                               <File className="w-4 h-4 opacity-60" />
                               <span className="text-sm font-medium">{label}</span>
+                              {(docType === 'IM8' || docType === 'IM7') && (
+                                <div className="ml-2 inline-flex rounded-md border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const current = selectedImDocType(containerId);
+                                      if (current === 'IM8') return;
+                                      setCustomsFile(containerId, 'IM7', null);
+                                      setNotAvailableCustomsByContainer((prev) => {
+                                        const row = { ...(prev[containerId] ?? {}) };
+                                        delete row.IM7;
+                                        return { ...prev, [containerId]: row };
+                                      });
+                                      setImDocTypeByContainer((prev) => ({ ...prev, [containerId]: 'IM8' }));
+                                    }}
+                                    className="px-2 py-1 text-xs"
+                                    style={{
+                                      backgroundColor: selectedImDocType(containerId) === 'IM8' ? 'var(--gold-accent)' : 'transparent',
+                                      color: selectedImDocType(containerId) === 'IM8' ? 'var(--navy-deep)' : 'inherit',
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    IM8
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const current = selectedImDocType(containerId);
+                                      if (current === 'IM7') return;
+                                      setCustomsFile(containerId, 'IM8', null);
+                                      setNotAvailableCustomsByContainer((prev) => {
+                                        const row = { ...(prev[containerId] ?? {}) };
+                                        delete row.IM8;
+                                        return { ...prev, [containerId]: row };
+                                      });
+                                      setImDocTypeByContainer((prev) => ({ ...prev, [containerId]: 'IM7' }));
+                                    }}
+                                    className="px-2 py-1 text-xs"
+                                    style={{
+                                      backgroundColor: selectedImDocType(containerId) === 'IM7' ? 'var(--gold-accent)' : 'transparent',
+                                      color: selectedImDocType(containerId) === 'IM7' ? 'var(--navy-deep)' : 'inherit',
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    IM7
+                                  </button>
+                                </div>
+                              )}
                             </div>
                             <div className="flex items-center gap-2">
                               {isNotAvailable && (
