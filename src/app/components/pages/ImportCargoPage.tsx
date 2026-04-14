@@ -49,7 +49,12 @@ export function ImportCargoPage() {
   const [imDocTypeByContainer, setImDocTypeByContainer] = useState<Record<string, 'IM8' | 'IM7'>>({});
 
   const requiredDocs = useMemo(() => requiredDocsForCategory(category), [category]);
-  const customsBaseDocTypes = useMemo(() => ['WH7', 'ASSESSMENT', 'DRAFT_DECLARATION', 'EXIT_NOTE', 'T1'], []);
+  const customsBaseDocTypes = useMemo(() => {
+    if (clearancePathway === 'T1_TRANSIT') {
+      return ['T1', 'EXIT_NOTE', 'IM4'];
+    }
+    return ['WH7', 'ASSESSMENT', 'DRAFT_DECLARATION', 'EXIT_NOTE'];
+  }, [clearancePathway]);
   const previewContainerIds = useMemo(() => {
     if (!isGroupImport) return selectedCargoId.trim() ? [selectedCargoId.trim()] : [];
     const bol = selectedCargoId.trim();
@@ -300,7 +305,9 @@ export function ImportCargoPage() {
           const useShared = useSharedMilestoneByContainer[cargoId] ?? true;
           const containerMilestone = useShared ? startingMilestone : (containerMilestoneOverrides[cargoId] ?? startingMilestone);
           if (!milestoneNeedsCustoms(containerMilestone)) continue;
-          const containerCustomsDocTypes = [...customsBaseDocTypes, selectedImDocType(cargoId)];
+          const containerCustomsDocTypes = clearancePathway === 'PORT_CLEARANCE'
+            ? [...customsBaseDocTypes, selectedImDocType(cargoId)]
+            : customsBaseDocTypes;
           for (const docType of containerCustomsDocTypes) {
             const file = containerFiles[docType];
             if (file && !containerNotAvailable[docType]) {
@@ -422,7 +429,7 @@ export function ImportCargoPage() {
             <p className="text-xs opacity-60 mt-1">
               {clearancePathway === 'PORT_CLEARANCE' 
                 ? 'Requires: Draft, Assessment, Exit Note' 
-                : 'Requires: T1 Form, IM8 Form, Exit Note'}
+                : 'Requires: T1 Form, Exit Note, IM4'}
             </p>
           </div>
 
@@ -858,13 +865,15 @@ export function ImportCargoPage() {
                     {previewContainerIds.map((containerId) => {
                       const containerFiles = customsFilesByContainer[containerId] ?? {};
                       const containerNA = notAvailableCustomsByContainer[containerId] ?? {};
-                      const activeDocTypes = [...customsBaseDocTypes, selectedImDocType(containerId)];
+                      const activeDocTypes = clearancePathway === 'PORT_CLEARANCE'
+                        ? [...customsBaseDocTypes, selectedImDocType(containerId)]
+                        : customsBaseDocTypes;
                       const handledCount = activeDocTypes.filter((docType) => Boolean(containerFiles[docType]) || containerNA[docType]).length;
                       return (
                         <div key={containerId} className="border rounded-lg p-5" style={{ borderColor: 'var(--border)' }}>
                           <div className="flex items-center justify-between mb-3">
                             <div className="text-sm font-mono" style={{ color: 'var(--primary)' }}>{containerId}</div>
-                            <div className="text-xs opacity-60">{handledCount} / {customsBaseDocTypes.length + 1} handled</div>
+                            <div className="text-xs opacity-60">{handledCount} / {activeDocTypes.length} handled</div>
                           </div>
                           <div className="space-y-4">
                             {activeDocTypes.map((docType) => {
