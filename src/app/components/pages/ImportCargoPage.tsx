@@ -5,17 +5,16 @@ import { getOpsClients } from '@/app/api/ops';
 import { fetchJson } from '@/app/api/client';
 
 type Category = 'MEDS_BEVERAGE' | 'RAW_MATERIALS' | 'ELECTRONICS';
+type StartingMilestone = 'DOCS_UPLOADED' | 'DOCS_VERIFIED' | 'DEPARTED_PORT' | 'IN_ROUTE_RUSUMO' | 'PHYSICAL_VERIFICATION' | 'WAREHOUSE_ARRIVAL';
 
 function requiredDocsForCategory(category: Category | '', milestone: string = ''): string[] {
   if (!category) return [];
-  const base = ['BILL_OF_LADING', 'COMMERCIAL_INVOICE', 'PACKING_LIST', 'T1_FORM'];
-  // T1 document must be ready before port departure
-  const withT1 = [...base, 'T1'];
+  const base = ['BILL_OF_LADING', 'COMMERCIAL_INVOICE', 'PACKING_LIST'];
   if (category === 'MEDS_BEVERAGE') {
-    return [...withT1.slice(0, -1), 'IMPORT_LICENSE', 'T1'];
+    return [...base, 'IMPORT_LICENSE'];
   }
-  if (category === 'RAW_MATERIALS') return withT1;
-  return [...withT1.slice(0, -1), 'TYPE_APPROVAL', 'T1'];
+  if (category === 'RAW_MATERIALS') return base;
+  return [...base, 'TYPE_APPROVAL'];
 }
 
 export function ImportCargoPage() {
@@ -31,7 +30,9 @@ export function ImportCargoPage() {
   const [selectedCargoId, setSelectedCargoId] = useState<string>('');
 
   const [milestoneCompletedAt, setMilestoneCompletedAt] = useState<string>('');
-  const [startingMilestone, setStartingMilestone] = useState<'DOCS_UPLOADED' | 'DOCS_VERIFIED' | 'DEPARTED_PORT' | 'IN_ROUTE_RUSUMO' | 'PHYSICAL_VERIFICATION' | 'WAREHOUSE_ARRIVAL'>('DOCS_UPLOADED');
+  const [startingMilestone, setStartingMilestone] = useState<StartingMilestone>('DOCS_UPLOADED');
+  const [useSharedMilestoneByContainer, setUseSharedMilestoneByContainer] = useState<Record<string, boolean>>({});
+  const [containerMilestoneOverrides, setContainerMilestoneOverrides] = useState<Record<string, StartingMilestone>>({});
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,18 +41,37 @@ export function ImportCargoPage() {
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, File>>({});
   const [notAvailableDocs, setNotAvailableDocs] = useState<Record<string, boolean>>({});
-  const [notAvailableCustomsDocs, setNotAvailableCustomsDocs] = useState<Record<string, boolean>>({});
   const [draggedOver, setDraggedOver] = useState<string | null>(null);
   
   const [showAssessmentForm, setShowAssessmentForm] = useState(false);
-  const [wh7File, setWh7File] = useState<File | null>(null);
-  const [assessmentFile, setAssessmentFile] = useState<File | null>(null);
-  const [draftFile, setDraftFile] = useState<File | null>(null);
-  const [t1File, setT1File] = useState<File | null>(null);
-  const [exitNoteFile, setExitNoteFile] = useState<File | null>(null);
-  const [im4File, setIm4File] = useState<File | null>(null);
+  const [customsFilesByContainer, setCustomsFilesByContainer] = useState<Record<string, Record<string, File>>>({});
+  const [notAvailableCustomsByContainer, setNotAvailableCustomsByContainer] = useState<Record<string, Record<string, boolean>>>({});
 
   const requiredDocs = useMemo(() => requiredDocsForCategory(category), [category]);
+  const customsDocTypes = useMemo(() => ['WH7', 'ASSESSMENT', 'DRAFT_DECLARATION', 'EXIT_NOTE', 'IM4', 'T1'], []);
+  const previewContainerIds = useMemo(() => {
+    if (!isGroupImport) return selectedCargoId.trim() ? [selectedCargoId.trim()] : [];
+    const bol = selectedCargoId.trim();
+    if (!bol) return [];
+    return Array.from({ length: containerCount }, (_, i) => `${bol}-${String(i + 1).padStart(3, '0')}`);
+  }, [isGroupImport, selectedCargoId, containerCount]);
+  const setCustomsFile = (containerId: string, docType: string, file: File | null) => {
+    setCustomsFilesByContainer((prev) => {
+      const byContainer = { ...(prev[containerId] ?? {}) };
+      if (file) byContainer[docType] = file;
+      else delete byContainer[docType];
+      return { ...prev, [containerId]: byContainer };
+    });
+  };
+  const toggleCustomsNotAvailable = (containerId: string, docType: string) => {
+    setNotAvailableCustomsByContainer((prev) => {
+      const byContainer = { ...(prev[containerId] ?? {}) };
+      if (byContainer[docType]) delete byContainer[docType];
+      else byContainer[docType] = true;
+      return { ...prev, [containerId]: byContainer };
+    });
+    setCustomsFile(containerId, docType, null);
+  };
   const cargoIdPlaceholder = category ? `Enter cargo ID (${category})` : 'Enter cargo ID';
   
   const milestoneDateLabel = useMemo(() => {
@@ -73,11 +93,32 @@ export function ImportCargoPage() {
     }
   }, [startingMilestone]);
   
-  const POST_DEPARTURE_MILESTONES = ['DEPARTED_PORT', 'IN_ROUTE_RUSUMO', 'PHYSICAL_VERIFICATION', 'WAREHOUSE_ARRIVAL'];
+  const POST_DEPARTURE_MILESTONES: StartingMilestone[] = ['DEPARTED_PORT', 'IN_ROUTE_RUSUMO', 'PHYSICAL_VERIFICATION', 'WAREHOUSE_ARRIVAL'];
+  const milestoneNeedsCustoms = (milestone: StartingMilestone) => POST_DEPARTURE_MILESTONES.includes(milestone);
 
   const needsAssessment = useMemo(() => {
-    return POST_DEPARTURE_MILESTONES.includes(startingMilestone);
-  }, [startingMilestone]);
+    if (!isGroupImport) return milestoneNeedsCustoms(startingMilestone);
+    if (!previewContainerIds.length) return milestoneNeedsCustoms(startingMilestone);
+    return previewContainerIds.some((containerId) => {
+      const useShared = useSharedMilestoneByContainer[containerId] ?? true;
+      const milestone = useShared ? startingMilestone : (containerMilestoneOverrides[containerId] ?? startingMilestone);
+      return milestoneNeedsCustoms(milestone);
+    });
+  }, [isGroupImport, previewContainerIds, useSharedMilestoneByContainer, containerMilestoneOverrides, startingMilestone]);
+
+  useEffect(() => {
+    if (!isGroupImport) return;
+    setUseSharedMilestoneByContainer((prev) => {
+      const next: Record<string, boolean> = {};
+      for (const id of previewContainerIds) next[id] = prev[id] ?? true;
+      return next;
+    });
+    setContainerMilestoneOverrides((prev) => {
+      const next: Record<string, StartingMilestone> = {};
+      for (const id of previewContainerIds) next[id] = prev[id] ?? startingMilestone;
+      return next;
+    });
+  }, [isGroupImport, previewContainerIds, startingMilestone]);
   
   const renderFileUpload = (label: string, file: File | null, setFile: (file: File | null) => void) => (
     <div className="border rounded-lg p-5" style={{ borderColor: file ? 'var(--gold-accent)' : 'var(--border)', backgroundColor: file ? 'rgba(212, 175, 55, 0.05)' : 'transparent' }}>
@@ -184,13 +225,18 @@ export function ImportCargoPage() {
     setSubmitting(true);
     try {
       const notAvailableDocsList = Object.keys(notAvailableDocs).filter(k => notAvailableDocs[k]);
-      const notAvailableCustomsList = Object.keys(notAvailableCustomsDocs).filter(k => notAvailableCustomsDocs[k]);
+      const notAvailableCustomsList: string[] = [];
       const completedAtIso = milestoneCompletedAt ? new Date(milestoneCompletedAt).toISOString() : null;
 
       // ── Determine container IDs to upload docs to ───────────────────
       let containerIds: string[] = [];
 
       if (isGroupImport) {
+        const perContainerMilestones = Object.fromEntries(
+          previewContainerIds
+            .filter((containerId) => !(useSharedMilestoneByContainer[containerId] ?? true))
+            .map((containerId) => [containerId, containerMilestoneOverrides[containerId] ?? startingMilestone])
+        );
         // Group import: register multiple containers under one BoL
         const bulkData = await fetchJson<{ containers: Array<{ cargo_id: string; container_id: string }> }>(`/ops/cargo/bulk-import`, {
           method: 'POST',
@@ -201,6 +247,7 @@ export function ImportCargoPage() {
             category,
             clearance_pathway: clearancePathway,
             starting_milestone: startingMilestone,
+            container_milestones: perContainerMilestones,
             milestone_completed_at: completedAtIso,
             not_available_docs: notAvailableDocsList,
             not_available_customs_docs: notAvailableCustomsList,
@@ -239,20 +286,19 @@ export function ImportCargoPage() {
           });
         }
 
-        // Customs docs
+        // Customs docs (per container)
         if (needsAssessment) {
-          const customsDocs = [
-            { file: wh7File, docType: 'WH7' },
-            { file: assessmentFile, docType: 'ASSESSMENT' },
-            { file: draftFile, docType: 'DRAFT_DECLARATION' },
-            { file: exitNoteFile, docType: 'EXIT_NOTE' },
-            { file: im4File, docType: 'IM4' },
-          ];
-          for (const doc of customsDocs) {
-            if (doc.file && !notAvailableCustomsDocs[doc.docType]) {
-              const path = `cargo/${cargoId}/documents/${doc.docType}/${doc.file.name}`;
-              await uploadFileToStorage(doc.file, path);
-              await fetchJson(`/ops/cargo/${cargoId}/documents/${doc.docType}`, {
+          const containerFiles = customsFilesByContainer[cargoId] ?? {};
+          const containerNotAvailable = notAvailableCustomsByContainer[cargoId] ?? {};
+          const useShared = useSharedMilestoneByContainer[cargoId] ?? true;
+          const containerMilestone = useShared ? startingMilestone : (containerMilestoneOverrides[cargoId] ?? startingMilestone);
+          if (!milestoneNeedsCustoms(containerMilestone)) continue;
+          for (const docType of customsDocTypes) {
+            const file = containerFiles[docType];
+            if (file && !containerNotAvailable[docType]) {
+              const path = `cargo/${cargoId}/documents/${docType}/${file.name}`;
+              await uploadFileToStorage(file, path);
+              await fetchJson(`/ops/cargo/${cargoId}/documents/${docType}`, {
                 method: 'PATCH',
                 body: JSON.stringify({ provider_path: path, status: 'VERIFIED', import_mode: true }),
               });
@@ -271,13 +317,10 @@ export function ImportCargoPage() {
       setShowAssessmentForm(false);
       setUploadedFiles({});
       setNotAvailableDocs({});
-      setNotAvailableCustomsDocs({});
-      setIm4File(null);
-      setWh7File(null);
-      setAssessmentFile(null);
-      setDraftFile(null);
-      setT1File(null);
-      setExitNoteFile(null);
+      setCustomsFilesByContainer({});
+      setNotAvailableCustomsByContainer({});
+      setUseSharedMilestoneByContainer({});
+      setContainerMilestoneOverrides({});
       setSelectedCargoId('');
       setMilestoneCompletedAt('');
       setContainerCount(2);
@@ -462,7 +505,58 @@ export function ImportCargoPage() {
                 className="w-full px-4 py-2.5 rounded-md border text-sm"
                 style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)' }}
               />
-              <div className="text-xs opacity-50 mt-1">Documents will be uploaded to all {containerCount} containers.</div>
+              <div className="text-xs opacity-50 mt-1">Required documents are shared to all {containerCount} containers; customs docs are uploaded per container below.</div>
+            </div>
+          )}
+
+          {isGroupImport && previewContainerIds.length > 0 && (
+            <div className="col-span-2 border rounded-lg p-4" style={{ borderColor: 'var(--border)' }}>
+              <div className="text-sm mb-3" style={{ fontWeight: 600 }}>Container-specific starting milestones</div>
+              <div className="space-y-3">
+                {previewContainerIds.map((containerId) => {
+                  const useShared = useSharedMilestoneByContainer[containerId] ?? true;
+                  const currentMilestone = containerMilestoneOverrides[containerId] ?? startingMilestone;
+                  return (
+                    <div key={containerId} className="border rounded-md p-3" style={{ borderColor: 'var(--border)' }}>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="font-mono text-sm">{containerId}</div>
+                        <label className="flex items-center gap-2 text-xs">
+                          <input
+                            type="checkbox"
+                            checked={useShared}
+                            onChange={(e) =>
+                              setUseSharedMilestoneByContainer((prev) => ({ ...prev, [containerId]: e.target.checked }))
+                            }
+                          />
+                          Use shared milestone
+                        </label>
+                      </div>
+                      {!useShared && (
+                        <div className="mt-3">
+                          <select
+                            value={currentMilestone}
+                            onChange={(e) =>
+                              setContainerMilestoneOverrides((prev) => ({
+                                ...prev,
+                                [containerId]: e.target.value as StartingMilestone,
+                              }))
+                            }
+                            className="w-full px-3 py-2 rounded-md border text-sm"
+                            style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)' }}
+                          >
+                            <option value="DOCS_UPLOADED">Docs Uploaded</option>
+                            <option value="DOCS_VERIFIED">Docs Verified</option>
+                            <option value="DEPARTED_PORT">Departed from Port</option>
+                            <option value="IN_ROUTE_RUSUMO">In Route to Rusumo</option>
+                            <option value="PHYSICAL_VERIFICATION">Physical Verification</option>
+                            <option value="WAREHOUSE_ARRIVAL">Warehouse Arrival</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -742,32 +836,40 @@ export function ImportCargoPage() {
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <h3 className="text-lg font-semibold">Customs Clearance Documents</h3>
-                      <p className="text-sm opacity-60 mt-1">Documents required after port departure: WH7, Assessment, Draft Declaration, Exit Note, IM4. Mark as Not Available if a document doesn't exist.</p>
+                      <p className="text-sm opacity-60 mt-1">
+                        These are uploaded per container (suffix-level). T1 is now handled here, not in Required Documents.
+                      </p>
                     </div>
                     <div className="text-sm font-medium px-4 py-2 rounded-lg" style={{ backgroundColor: 'var(--gold-accent)', color: 'var(--navy-deep)' }}>
-                      {[
-                        wh7File || notAvailableCustomsDocs['WH7'],
-                        assessmentFile || notAvailableCustomsDocs['ASSESSMENT'],
-                        draftFile || notAvailableCustomsDocs['DRAFT_DECLARATION'],
-                        exitNoteFile || notAvailableCustomsDocs['EXIT_NOTE'],
-                        im4File || notAvailableCustomsDocs['IM4'],
-                      ].filter(Boolean).length} / 5 handled
+                      {previewContainerIds.length} container{previewContainerIds.length === 1 ? '' : 's'}
                     </div>
                   </div>
 
                   <div className="space-y-4">
-                    {([
-                      { label: 'WH7', docType: 'WH7', file: wh7File, setFile: setWh7File },
-                      { label: 'Assessment', docType: 'ASSESSMENT', file: assessmentFile, setFile: setAssessmentFile },
-                      { label: 'Draft Declaration', docType: 'DRAFT_DECLARATION', file: draftFile, setFile: setDraftFile },
-                      { label: 'Exit Note', docType: 'EXIT_NOTE', file: exitNoteFile, setFile: setExitNoteFile },
-                      { label: 'IM4 Document', docType: 'IM4', file: im4File, setFile: setIm4File },
-                    ] as { label: string; docType: string; file: File | null; setFile: (f: File | null) => void }[]).map(({ label, docType, file, setFile }) => {
-                      const isNotAvailable = notAvailableCustomsDocs[docType] === true;
-                      const borderColor = isNotAvailable ? 'rgb(239,68,68)' : file ? 'var(--gold-accent)' : 'var(--border)';
-                      const bgColor = isNotAvailable ? 'rgba(239,68,68,0.05)' : file ? 'rgba(212,175,55,0.05)' : 'transparent';
+                    {previewContainerIds.map((containerId) => {
+                      const containerFiles = customsFilesByContainer[containerId] ?? {};
+                      const containerNA = notAvailableCustomsByContainer[containerId] ?? {};
+                      const handledCount = customsDocTypes.filter((docType) => Boolean(containerFiles[docType]) || containerNA[docType]).length;
                       return (
-                        <div key={docType} className="border rounded-lg p-5 transition-all" style={{ borderColor, backgroundColor: bgColor }}>
+                        <div key={containerId} className="border rounded-lg p-5" style={{ borderColor: 'var(--border)' }}>
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="text-sm font-mono" style={{ color: 'var(--primary)' }}>{containerId}</div>
+                            <div className="text-xs opacity-60">{handledCount} / {customsDocTypes.length} handled</div>
+                          </div>
+                          <div className="space-y-4">
+                            {customsDocTypes.map((docType) => {
+                              const label =
+                                docType === 'DRAFT_DECLARATION'
+                                  ? 'Draft Declaration'
+                                  : docType === 'IM4'
+                                    ? 'IM4 Document'
+                                    : docType;
+                              const file = containerFiles[docType] ?? null;
+                              const isNotAvailable = containerNA[docType] === true;
+                              const borderColor = isNotAvailable ? 'rgb(239,68,68)' : file ? 'var(--gold-accent)' : 'var(--border)';
+                              const bgColor = isNotAvailable ? 'rgba(239,68,68,0.05)' : file ? 'rgba(212,175,55,0.05)' : 'transparent';
+                              return (
+                                <div key={`${containerId}-${docType}`} className="border rounded-lg p-5 transition-all" style={{ borderColor, backgroundColor: bgColor }}>
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-2">
                               <File className="w-4 h-4 opacity-60" />
@@ -785,12 +887,7 @@ export function ImportCargoPage() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  if (isNotAvailable) {
-                                    setNotAvailableCustomsDocs(prev => { const n = { ...prev }; delete n[docType]; return n; });
-                                  } else {
-                                    setNotAvailableCustomsDocs(prev => ({ ...prev, [docType]: true }));
-                                    setFile(null);
-                                  }
+                                  toggleCustomsNotAvailable(containerId, docType);
                                 }}
                                 className="text-xs px-2 py-1 rounded-md border transition-colors"
                                 style={{
@@ -820,7 +917,7 @@ export function ImportCargoPage() {
                                     <div className="text-xs opacity-60">{(file.size / 1024).toFixed(1)} KB</div>
                                     <button
                                       type="button"
-                                      onClick={(e) => { e.preventDefault(); setFile(null); }}
+                                      onClick={(e) => { e.preventDefault(); setCustomsFile(containerId, docType, null); }}
                                       className="text-xs text-red-600 hover:text-red-700 underline mt-2"
                                     >
                                       Remove
@@ -838,10 +935,14 @@ export function ImportCargoPage() {
                                 type="file"
                                 className="hidden"
                                 accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                onChange={(e) => { const f = e.target.files?.[0]; if (f) setFile(f); }}
+                                onChange={(e) => { const f = e.target.files?.[0]; if (f) setCustomsFile(containerId, docType, f); }}
                               />
                             </label>
                           )}
+                        </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       );
                     })}
