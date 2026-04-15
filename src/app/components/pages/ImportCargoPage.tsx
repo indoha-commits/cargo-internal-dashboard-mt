@@ -30,9 +30,8 @@ export function ImportCargoPage() {
   const [selectedCargoId, setSelectedCargoId] = useState<string>('');
 
   const [milestoneCompletedAt, setMilestoneCompletedAt] = useState<string>('');
-  const [startingMilestone, setStartingMilestone] = useState<StartingMilestone>('DOCS_UPLOADED');
-  const [useSharedMilestoneByContainer, setUseSharedMilestoneByContainer] = useState<Record<string, boolean>>({});
-  const [containerMilestoneOverrides, setContainerMilestoneOverrides] = useState<Record<string, StartingMilestone>>({});
+  const [startingMilestone, setStartingMilestone] = useState<StartingMilestone>('DOCS_UPLOADED'); // default for new containers + "apply to all"
+  const [milestoneByContainer, setMilestoneByContainer] = useState<Record<string, StartingMilestone>>({});
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,28 +111,20 @@ export function ImportCargoPage() {
   const milestoneNeedsCustoms = (milestone: StartingMilestone) => POST_DEPARTURE_MILESTONES.includes(milestone);
 
   const needsAssessment = useMemo(() => {
-    if (!isGroupImport) return milestoneNeedsCustoms(startingMilestone);
     if (!previewContainerIds.length) return milestoneNeedsCustoms(startingMilestone);
-    return previewContainerIds.some((containerId) => {
-      const useShared = useSharedMilestoneByContainer[containerId] ?? true;
-      const milestone = useShared ? startingMilestone : (containerMilestoneOverrides[containerId] ?? startingMilestone);
-      return milestoneNeedsCustoms(milestone);
-    });
-  }, [isGroupImport, previewContainerIds, useSharedMilestoneByContainer, containerMilestoneOverrides, startingMilestone]);
+    return previewContainerIds.some((containerId) => milestoneNeedsCustoms(milestoneByContainer[containerId] ?? startingMilestone));
+  }, [previewContainerIds, milestoneByContainer, startingMilestone]);
 
   useEffect(() => {
-    if (!isGroupImport) return;
-    setUseSharedMilestoneByContainer((prev) => {
-      const next: Record<string, boolean> = {};
-      for (const id of previewContainerIds) next[id] = prev[id] ?? true;
+    if (!previewContainerIds.length) return;
+    setMilestoneByContainer((prev) => {
+      const next = { ...prev };
+      for (const id of previewContainerIds) {
+        if (next[id] == null) next[id] = startingMilestone;
+      }
       return next;
     });
-    setContainerMilestoneOverrides((prev) => {
-      const next: Record<string, StartingMilestone> = {};
-      for (const id of previewContainerIds) next[id] = prev[id] ?? startingMilestone;
-      return next;
-    });
-  }, [isGroupImport, previewContainerIds, startingMilestone]);
+  }, [previewContainerIds, startingMilestone]);
 
   useEffect(() => {
     if (!previewContainerIds.length) return;
@@ -259,9 +250,7 @@ export function ImportCargoPage() {
 
       if (isGroupImport) {
         const perContainerMilestones = Object.fromEntries(
-          previewContainerIds
-            .filter((containerId) => !(useSharedMilestoneByContainer[containerId] ?? true))
-            .map((containerId) => [containerId, containerMilestoneOverrides[containerId] ?? startingMilestone])
+          previewContainerIds.map((containerId) => [containerId, milestoneByContainer[containerId] ?? startingMilestone])
         );
         // Group import: register multiple containers under one BoL
         const bulkData = await fetchJson<{ containers: Array<{ cargo_id: string; container_id: string }> }>(`/ops/cargo/bulk-import`, {
@@ -272,7 +261,7 @@ export function ImportCargoPage() {
             container_count: containerCount,
             category,
             clearance_pathway: clearancePathway,
-            starting_milestone: startingMilestone,
+            starting_milestone: perContainerMilestones[previewContainerIds[0]] ?? startingMilestone,
             container_milestones: perContainerMilestones,
             milestone_completed_at: completedAtIso,
             not_available_docs: notAvailableDocsList,
@@ -298,7 +287,7 @@ export function ImportCargoPage() {
             category,
             clearance_pathway: clearancePathway,
             milestone_completed_at: completedAtIso,
-            starting_milestone: startingMilestone,
+            starting_milestone: milestoneByContainer[selectedCargoId.trim()] ?? startingMilestone,
             not_available_docs: notAvailableDocsList,
             not_available_customs_docs: notAvailableCustomsList,
             ...(clearancePathway === 'T1_TRANSIT'
@@ -326,8 +315,7 @@ export function ImportCargoPage() {
         if (needsAssessment) {
           const containerFiles = customsFilesByContainer[cargoId] ?? {};
           const containerNotAvailable = notAvailableCustomsByContainer[cargoId] ?? {};
-          const useShared = useSharedMilestoneByContainer[cargoId] ?? true;
-          const containerMilestone = useShared ? startingMilestone : (containerMilestoneOverrides[cargoId] ?? startingMilestone);
+          const containerMilestone = milestoneByContainer[cargoId] ?? startingMilestone;
           if (!milestoneNeedsCustoms(containerMilestone)) continue;
           const containerCustomsDocTypes = customsDocTypesForContainer(cargoId);
           for (const docType of containerCustomsDocTypes) {
@@ -356,8 +344,7 @@ export function ImportCargoPage() {
       setNotAvailableDocs({});
       setCustomsFilesByContainer({});
       setNotAvailableCustomsByContainer({});
-      setUseSharedMilestoneByContainer({});
-      setContainerMilestoneOverrides({});
+      setMilestoneByContainer({});
       setImDocTypeByContainer({});
       setSelectedCargoId('');
       setMilestoneCompletedAt('');
@@ -547,50 +534,55 @@ export function ImportCargoPage() {
             </div>
           )}
 
-          {isGroupImport && previewContainerIds.length > 0 && (
+          {previewContainerIds.length > 0 && (
             <div className="col-span-2 border rounded-lg p-4" style={{ borderColor: 'var(--border)' }}>
-              <div className="text-sm mb-3" style={{ fontWeight: 600 }}>Container-specific starting milestones</div>
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div className="text-sm" style={{ fontWeight: 600 }}>Milestone per container</div>
+                {previewContainerIds.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMilestoneByContainer((prev) => {
+                        const next = { ...prev };
+                        for (const id of previewContainerIds) next[id] = startingMilestone;
+                        return next;
+                      })
+                    }
+                    className="text-xs px-3 py-1.5 rounded-md border"
+                    style={{ borderColor: 'var(--border)', opacity: 0.9 }}
+                  >
+                    Apply “{startingMilestone.replace(/_/g, ' ')}” to all
+                  </button>
+                )}
+              </div>
               <div className="space-y-3">
                 {previewContainerIds.map((containerId) => {
-                  const useShared = useSharedMilestoneByContainer[containerId] ?? true;
-                  const currentMilestone = containerMilestoneOverrides[containerId] ?? startingMilestone;
+                  const currentMilestone = milestoneByContainer[containerId] ?? startingMilestone;
                   return (
                     <div key={containerId} className="border rounded-md p-3" style={{ borderColor: 'var(--border)' }}>
                       <div className="flex items-center justify-between gap-3">
                         <div className="font-mono text-sm">{containerId}</div>
-                        <label className="flex items-center gap-2 text-xs">
-                          <input
-                            type="checkbox"
-                            checked={useShared}
-                            onChange={(e) =>
-                              setUseSharedMilestoneByContainer((prev) => ({ ...prev, [containerId]: e.target.checked }))
-                            }
-                          />
-                          Use shared milestone
-                        </label>
                       </div>
-                      {!useShared && (
-                        <div className="mt-3">
-                          <select
-                            value={currentMilestone}
-                            onChange={(e) =>
-                              setContainerMilestoneOverrides((prev) => ({
-                                ...prev,
-                                [containerId]: e.target.value as StartingMilestone,
-                              }))
-                            }
-                            className="w-full px-3 py-2 rounded-md border text-sm"
-                            style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)' }}
-                          >
-                            <option value="DOCS_UPLOADED">Docs Uploaded</option>
-                            <option value="DOCS_VERIFIED">Docs Verified</option>
-                            <option value="DEPARTED_PORT">Departed from Port</option>
-                            <option value="IN_ROUTE_RUSUMO">In Route to Rusumo</option>
-                            <option value="PHYSICAL_VERIFICATION">Physical Verification</option>
-                            <option value="WAREHOUSE_ARRIVAL">Warehouse Arrival</option>
-                          </select>
-                        </div>
-                      )}
+                      <div className="mt-3">
+                        <select
+                          value={currentMilestone}
+                          onChange={(e) =>
+                            setMilestoneByContainer((prev) => ({
+                              ...prev,
+                              [containerId]: e.target.value as StartingMilestone,
+                            }))
+                          }
+                          className="w-full px-3 py-2 rounded-md border text-sm"
+                          style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)' }}
+                        >
+                          <option value="DOCS_UPLOADED">Docs Uploaded</option>
+                          <option value="DOCS_VERIFIED">Docs Verified</option>
+                          <option value="DEPARTED_PORT">Departed from Port</option>
+                          <option value="IN_ROUTE_RUSUMO">In Route to Rusumo</option>
+                          <option value="PHYSICAL_VERIFICATION">Physical Verification</option>
+                          <option value="WAREHOUSE_ARRIVAL">Warehouse Arrival</option>
+                        </select>
+                      </div>
                     </div>
                   );
                 })}
