@@ -49,12 +49,14 @@ export function ImportCargoPage() {
   const [imDocTypeByContainer, setImDocTypeByContainer] = useState<Record<string, 'IM8' | 'IM7'>>({});
 
   const requiredDocs = useMemo(() => requiredDocsForCategory(category), [category]);
+  /** Base customs types (per suffix container). T1 adds IM7 or IM8 per container via `selectedImDocType`. */
   const customsBaseDocTypes = useMemo(() => {
     if (clearancePathway === 'T1_TRANSIT') {
-      return ['T1', 'EXIT_NOTE', 'IM4'];
+      return ['DRAFT_DECLARATION', 'ASSESSMENT', 'T1', 'T1_FORM', 'WH7'];
     }
-    return ['WH7', 'ASSESSMENT', 'DRAFT_DECLARATION', 'EXIT_NOTE'];
+    return ['DRAFT_DECLARATION', 'ASSESSMENT', 'WH7', 'EXIT_NOTE'];
   }, [clearancePathway]);
+
   const previewContainerIds = useMemo(() => {
     if (!isGroupImport) return selectedCargoId.trim() ? [selectedCargoId.trim()] : [];
     const bol = selectedCargoId.trim();
@@ -79,6 +81,12 @@ export function ImportCargoPage() {
     setCustomsFile(containerId, docType, null);
   };
   const selectedImDocType = (containerId: string): 'IM8' | 'IM7' => imDocTypeByContainer[containerId] ?? 'IM8';
+
+  const customsDocTypesForContainer = (containerId: string) =>
+    clearancePathway === 'T1_TRANSIT'
+      ? [...customsBaseDocTypes, selectedImDocType(containerId)]
+      : customsBaseDocTypes;
+
   const cargoIdPlaceholder = category ? `Enter cargo ID (${category})` : 'Enter cargo ID';
   
   const milestoneDateLabel = useMemo(() => {
@@ -125,12 +133,18 @@ export function ImportCargoPage() {
       for (const id of previewContainerIds) next[id] = prev[id] ?? startingMilestone;
       return next;
     });
+  }, [isGroupImport, previewContainerIds, startingMilestone]);
+
+  useEffect(() => {
+    if (!previewContainerIds.length) return;
     setImDocTypeByContainer((prev) => {
-      const next: Record<string, 'IM8' | 'IM7'> = {};
-      for (const id of previewContainerIds) next[id] = prev[id] ?? 'IM8';
+      const next = { ...prev };
+      for (const id of previewContainerIds) {
+        if (next[id] == null) next[id] = 'IM8';
+      }
       return next;
     });
-  }, [isGroupImport, previewContainerIds, startingMilestone]);
+  }, [previewContainerIds]);
   
   const renderFileUpload = (label: string, file: File | null, setFile: (file: File | null) => void) => (
     <div className="border rounded-lg p-5" style={{ borderColor: file ? 'var(--gold-accent)' : 'var(--border)', backgroundColor: file ? 'rgba(212, 175, 55, 0.05)' : 'transparent' }}>
@@ -263,6 +277,13 @@ export function ImportCargoPage() {
             milestone_completed_at: completedAtIso,
             not_available_docs: notAvailableDocsList,
             not_available_customs_docs: notAvailableCustomsList,
+            ...(clearancePathway === 'T1_TRANSIT'
+              ? {
+                  im_doc_type_by_container: Object.fromEntries(
+                    previewContainerIds.map((id) => [id, selectedImDocType(id)])
+                  ),
+                }
+              : {}),
           }),
         });
         containerIds = bulkData.containers.map((c) => c.container_id);
@@ -280,6 +301,9 @@ export function ImportCargoPage() {
             starting_milestone: startingMilestone,
             not_available_docs: notAvailableDocsList,
             not_available_customs_docs: notAvailableCustomsList,
+            ...(clearancePathway === 'T1_TRANSIT'
+              ? { im_doc_type: selectedImDocType(selectedCargoId.trim()) }
+              : {}),
           }),
         });
         containerIds = [data.container_id];
@@ -305,9 +329,7 @@ export function ImportCargoPage() {
           const useShared = useSharedMilestoneByContainer[cargoId] ?? true;
           const containerMilestone = useShared ? startingMilestone : (containerMilestoneOverrides[cargoId] ?? startingMilestone);
           if (!milestoneNeedsCustoms(containerMilestone)) continue;
-          const containerCustomsDocTypes = clearancePathway === 'PORT_CLEARANCE'
-            ? [...customsBaseDocTypes, selectedImDocType(cargoId)]
-            : customsBaseDocTypes;
+          const containerCustomsDocTypes = customsDocTypesForContainer(cargoId);
           for (const docType of containerCustomsDocTypes) {
             const file = containerFiles[docType];
             if (file && !containerNotAvailable[docType]) {
@@ -427,9 +449,9 @@ export function ImportCargoPage() {
               <ChevronDown className="w-4 h-4 opacity-50 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
             <p className="text-xs opacity-60 mt-1">
-              {clearancePathway === 'PORT_CLEARANCE' 
-                ? 'Requires: Draft, Assessment, Exit Note' 
-                : 'Requires: T1 Form, Exit Note, IM4'}
+              {clearancePathway === 'PORT_CLEARANCE'
+                ? 'Customs (per container): Draft, Assessment, WH7, Exit note'
+                : 'Customs (per container): Draft, Assessment, T1, T1 form, WH7, IM7 or IM8'}
             </p>
           </div>
 
@@ -832,7 +854,7 @@ export function ImportCargoPage() {
                     className="px-5 py-2.5 rounded-md text-sm transition-colors duration-150"
                     style={{ backgroundColor: 'var(--gold-accent)', color: 'var(--navy-deep)', fontWeight: 600 }}
                   >
-                    Next: Assessment and Exit Note
+                    Next: Customs clearance
                   </button>
                 ) : (
                   <button
@@ -853,7 +875,7 @@ export function ImportCargoPage() {
                     <div>
                       <h3 className="text-lg font-semibold">Customs Clearance Documents</h3>
                       <p className="text-sm opacity-60 mt-1">
-                        These are uploaded per container (suffix-level). T1 is now handled here, not in Required Documents.
+                        Port: draft, assessment, WH7, exit note. T1: same through WH7, then T1, T1 form, and IM7 or IM8 (choose per suffix). Each row is one container ID.
                       </p>
                     </div>
                     <div className="text-sm font-medium px-4 py-2 rounded-lg" style={{ backgroundColor: 'var(--gold-accent)', color: 'var(--navy-deep)' }}>
@@ -865,9 +887,7 @@ export function ImportCargoPage() {
                     {previewContainerIds.map((containerId) => {
                       const containerFiles = customsFilesByContainer[containerId] ?? {};
                       const containerNA = notAvailableCustomsByContainer[containerId] ?? {};
-                      const activeDocTypes = clearancePathway === 'PORT_CLEARANCE'
-                        ? [...customsBaseDocTypes, selectedImDocType(containerId)]
-                        : customsBaseDocTypes;
+                      const activeDocTypes = customsDocTypesForContainer(containerId);
                       const handledCount = activeDocTypes.filter((docType) => Boolean(containerFiles[docType]) || containerNA[docType]).length;
                       return (
                         <div key={containerId} className="border rounded-lg p-5" style={{ borderColor: 'var(--border)' }}>
@@ -879,12 +899,22 @@ export function ImportCargoPage() {
                             {activeDocTypes.map((docType) => {
                               const label =
                                 docType === 'DRAFT_DECLARATION'
-                                  ? 'Draft Declaration'
-                                  : docType === 'IM8'
-                                    ? 'IM8 Document'
-                                    : docType === 'IM7'
-                                      ? 'IM7 Document'
-                                    : docType;
+                                  ? 'Draft declaration'
+                                  : docType === 'ASSESSMENT'
+                                    ? 'Assessment'
+                                    : docType === 'WH7'
+                                      ? 'WH7'
+                                      : docType === 'EXIT_NOTE'
+                                        ? 'Exit note'
+                                        : docType === 'T1'
+                                          ? 'T1'
+                                          : docType === 'T1_FORM'
+                                            ? 'T1 form'
+                                            : docType === 'IM8'
+                                              ? 'IM8'
+                                              : docType === 'IM7'
+                                                ? 'IM7'
+                                                : docType;
                               const file = containerFiles[docType] ?? null;
                               const isNotAvailable = containerNA[docType] === true;
                               const borderColor = isNotAvailable ? 'rgb(239,68,68)' : file ? 'var(--gold-accent)' : 'var(--border)';
@@ -895,7 +925,7 @@ export function ImportCargoPage() {
                             <div className="flex items-center gap-2">
                               <File className="w-4 h-4 opacity-60" />
                               <span className="text-sm font-medium">{label}</span>
-                              {(docType === 'IM8' || docType === 'IM7') && (
+                              {clearancePathway === 'T1_TRANSIT' && (docType === 'IM8' || docType === 'IM7') && (
                                 <div className="ml-2 inline-flex rounded-md border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
                                   <button
                                     type="button"
