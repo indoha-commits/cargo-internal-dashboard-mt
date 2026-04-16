@@ -307,7 +307,7 @@ export function ImportCargoPage() {
           await uploadFileToStorage(file, path);
           await fetchJson(`/ops/cargo/${cargoId}/documents/${docType}`, {
             method: 'PATCH',
-            body: JSON.stringify({ provider_path: path, status: 'VERIFIED', import_mode: true }),
+            body: JSON.stringify({ client_id: selectedClientId, provider_path: path, status: 'VERIFIED', import_mode: true }),
           });
         }
 
@@ -325,7 +325,7 @@ export function ImportCargoPage() {
               await uploadFileToStorage(file, path);
               await fetchJson(`/ops/cargo/${cargoId}/documents/${docType}`, {
                 method: 'PATCH',
-                body: JSON.stringify({ provider_path: path, status: 'VERIFIED', import_mode: true }),
+                body: JSON.stringify({ client_id: selectedClientId, provider_path: path, status: 'VERIFIED', import_mode: true }),
               });
             }
           }
