@@ -51,7 +51,7 @@ export function ImportCargoPage() {
   /** Base customs types (per suffix container). T1 adds IM7 or IM8 per container via `selectedImDocType`. */
   const customsBaseDocTypes = useMemo(() => {
     if (clearancePathway === 'T1_TRANSIT') {
-      return ['DRAFT_DECLARATION', 'ASSESSMENT', 'T1', 'T1_FORM', 'WH7'];
+      return ['DRAFT_DECLARATION', 'ASSESSMENT', 'T1', 'T1_FORM', 'WH7', 'CHANGE_OF_OWNERSHIP'];
     }
     return ['DRAFT_DECLARATION', 'ASSESSMENT', 'WH7', 'EXIT_NOTE'];
   }, [clearancePathway]);
