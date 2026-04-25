@@ -22,6 +22,12 @@ export function ImportCargoPage() {
   const [containerCount, setContainerCount] = useState(2);
   const [category, setCategory] = useState<Category | ''>('');
   const [clearancePathway, setClearancePathway] = useState<'PORT_CLEARANCE' | 'T1_TRANSIT'>('PORT_CLEARANCE');
+  const [serviceScope, setServiceScope] = useState<'LOGISTICS_AND_CLEARING' | 'CLEARING_ONLY'>('LOGISTICS_AND_CLEARING');
+  const [dmc, setDmc] = useState<string>('');
+  const [price, setPrice] = useState<string>('0');
+  const [revenue, setRevenue] = useState<string>('0');
+  const [cost, setCost] = useState<string>('0');
+  const [duePaymentDate, setDuePaymentDate] = useState<string>('');
 
   const [clients, setClients] = useState<Array<{ id: string; name: string }>>([]);
   const [loadingClients, setLoadingClients] = useState(true);
@@ -261,6 +267,12 @@ export function ImportCargoPage() {
             container_count: containerCount,
             category,
             clearance_pathway: clearancePathway,
+            service_scope: serviceScope,
+            dmc: dmc.trim() || null,
+            price: Number(price || 0),
+            revenue: Number(revenue || 0),
+            cost: Number(cost || 0),
+            due_payment_date: duePaymentDate || null,
             starting_milestone: perContainerMilestones[previewContainerIds[0]] ?? startingMilestone,
             container_milestones: perContainerMilestones,
             milestone_completed_at: completedAtIso,
@@ -286,6 +298,12 @@ export function ImportCargoPage() {
             cargo_id: selectedCargoId.trim(),
             category,
             clearance_pathway: clearancePathway,
+            service_scope: serviceScope,
+            dmc: dmc.trim() || null,
+            price: Number(price || 0),
+            revenue: Number(revenue || 0),
+            cost: Number(cost || 0),
+            due_payment_date: duePaymentDate || null,
             milestone_completed_at: completedAtIso,
             starting_milestone: milestoneByContainer[selectedCargoId.trim()] ?? startingMilestone,
             not_available_docs: notAvailableDocsList,
@@ -442,6 +460,27 @@ export function ImportCargoPage() {
             </p>
           </div>
 
+          <div>
+            <label className="block text-sm opacity-70 mb-2" style={{ fontWeight: 500 }}>
+              Service Scope
+            </label>
+            <div className="relative">
+              <select
+                value={serviceScope}
+                onChange={(e) => setServiceScope(e.target.value as any)}
+                className="w-full px-4 py-2.5 rounded-md border text-sm appearance-none"
+                style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)' }}
+              >
+                <option value="LOGISTICS_AND_CLEARING">Logistics + Clearing</option>
+                <option value="CLEARING_ONLY">Clearing only (no transport)</option>
+              </select>
+              <ChevronDown className="w-4 h-4 opacity-50 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+            <p className="text-xs opacity-60 mt-1">
+              Used for manager reporting + receivables (separates transport work vs clearing-only).
+            </p>
+          </div>
+
           <div className="col-span-2">
             <label className="block text-sm opacity-70 mb-2" style={{ fontWeight: 500 }}>
               Client
@@ -513,6 +552,82 @@ export function ImportCargoPage() {
                 Containers will be: {selectedCargoId}-001, {selectedCargoId}-002, …
               </div>
             )}
+          </div>
+
+          {/* Finance / Clearing tracking fields (shipment-level) */}
+          <div className="col-span-2 grid grid-cols-2 gap-6">
+            <div className="col-span-2 text-xs opacity-60">
+              Finance fields are stored per shipment (BoL group) for the Manager Dashboard (Shipments / Payments / Receivables).
+            </div>
+            <div>
+              <label className="block text-sm opacity-70 mb-2" style={{ fontWeight: 500 }}>
+                DMC (optional)
+              </label>
+              <input
+                type="text"
+                value={dmc}
+                onChange={(e) => setDmc(e.target.value)}
+                placeholder="e.g. DMC-2026-0412"
+                className="w-full px-4 py-2.5 rounded-md border text-sm"
+                style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)' }}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm opacity-70 mb-2" style={{ fontWeight: 500 }}>
+                Due payment date (optional)
+              </label>
+              <input
+                type="date"
+                value={duePaymentDate}
+                onChange={(e) => setDuePaymentDate(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-md border text-sm"
+                style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)' }}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm opacity-70 mb-2" style={{ fontWeight: 500 }}>
+                Price (RWF)
+              </label>
+              <input
+                inputMode="decimal"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-md border text-sm"
+                style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)' }}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm opacity-70 mb-2" style={{ fontWeight: 500 }}>
+                Revenue (RWF)
+              </label>
+              <input
+                inputMode="decimal"
+                value={revenue}
+                onChange={(e) => setRevenue(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-md border text-sm"
+                style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)' }}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm opacity-70 mb-2" style={{ fontWeight: 500 }}>
+                Cost (RWF)
+              </label>
+              <input
+                inputMode="decimal"
+                value={cost}
+                onChange={(e) => setCost(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-md border text-sm"
+                style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)' }}
+              />
+            </div>
+
+            <div className="flex items-end text-xs opacity-60">
+              Profit is calculated as Revenue − Cost in Manager Dashboard.
+            </div>
           </div>
 
           {/* Container count (group import only) */}
