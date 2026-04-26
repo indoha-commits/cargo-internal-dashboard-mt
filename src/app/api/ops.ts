@@ -292,6 +292,8 @@ export type OpsCreateClientRequest = {
   name: string;
   email: string;
   password: string;
+  tin: string;
+  price_per_dmc: 118000 | 142600;
 };
 
 export type OpsCreateClientResponse = {

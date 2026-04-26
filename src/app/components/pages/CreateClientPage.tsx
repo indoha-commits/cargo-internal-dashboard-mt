@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { createOpsClient } from '@/app/api/ops';
 
+const PRICE_OPTIONS = [
+  { value: 118000, label: '118,000 RWF / container' },
+  { value: 142600, label: '142,600 RWF / container' },
+] as const;
+
 interface CreateClientPageProps {
   onCreated: (client: { id: string; name: string }) => void;
   onCancel: () => void;
@@ -10,6 +15,8 @@ export function CreateClientPage({ onCreated, onCancel }: CreateClientPageProps)
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [tin, setTin] = useState('');
+  const [pricePerDmc, setPricePerDmc] = useState<118000 | 142600>(118000);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,23 +26,16 @@ export function CreateClientPage({ onCreated, onCancel }: CreateClientPageProps)
 
     const clientName = name.trim();
     const em = email.trim().toLowerCase();
-    
-    if (!clientName) {
-      setError('Client name is required');
-      return;
-    }
-    if (!em || !em.includes('@')) {
-      setError('Please enter a valid email');
-      return;
-    }
-    if (!password) {
-      setError('Password is required');
-      return;
-    }
+    const tinVal = tin.trim();
+
+    if (!clientName) { setError('Client name is required'); return; }
+    if (!em || !em.includes('@')) { setError('Please enter a valid email'); return; }
+    if (!password) { setError('Password is required'); return; }
+    if (!tinVal) { setError('TIN number is required'); return; }
 
     setSubmitting(true);
     try {
-      const res = await createOpsClient({ name: clientName, email: em, password });
+      const res = await createOpsClient({ name: clientName, email: em, password, tin: tinVal, price_per_dmc: pricePerDmc });
       onCreated(res.client);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -48,50 +48,104 @@ export function CreateClientPage({ onCreated, onCancel }: CreateClientPageProps)
     <div className="max-w-xl mx-auto">
       <div className="mb-6">
         <h1>Create Client</h1>
-        <p className="text-sm opacity-60 mt-2">Create a new client with login credentials. An email with the credentials will be sent to the client.</p>
+        <p className="text-sm opacity-60 mt-2">
+          Create a new client with login credentials. An email with the credentials will be sent to the client.
+        </p>
       </div>
 
       <div className="bg-card rounded-lg border" style={{ borderColor: 'var(--border)' }}>
         <form onSubmit={submit} className="p-6 space-y-4">
           {error && (
-            <div className="text-sm" style={{ color: 'var(--destructive)' }}>
+            <div className="text-sm px-3 py-2 rounded" style={{ color: 'var(--destructive)', backgroundColor: 'color-mix(in srgb, var(--destructive) 10%, transparent)' }}>
               {error}
             </div>
           )}
 
+          {/* Company name */}
           <div>
-            <label className="block text-sm opacity-70 mb-1">Client name</label>
+            <label className="block text-sm opacity-70 mb-1">
+              Company name <span style={{ color: 'var(--destructive)' }}>*</span>
+            </label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 rounded border bg-transparent"
+              className="w-full px-3 py-2 rounded border bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/30"
               style={{ borderColor: 'var(--border)' }}
-              placeholder="Company Name"
+              placeholder="e.g. Rwanda Wildlife Conservation Association"
               autoComplete="organization"
+              required
             />
           </div>
 
+          {/* TIN number */}
           <div>
-            <label className="block text-sm opacity-70 mb-1">Client email</label>
+            <label className="block text-sm opacity-70 mb-1">
+              TIN number <span style={{ color: 'var(--destructive)' }}>*</span>
+            </label>
+            <input
+              value={tin}
+              onChange={(e) => setTin(e.target.value)}
+              className="w-full px-3 py-2 rounded border bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/30"
+              style={{ borderColor: 'var(--border)' }}
+              placeholder="e.g. 106723906"
+              required
+            />
+            <p className="text-xs opacity-50 mt-1">Taxpayer Identification Number — required for all invoices.</p>
+          </div>
+
+          {/* Price per DMC */}
+          <div>
+            <label className="block text-sm opacity-70 mb-1">
+              Price per DMC / container <span style={{ color: 'var(--destructive)' }}>*</span>
+            </label>
+            <select
+              value={pricePerDmc}
+              onChange={(e) => setPricePerDmc(Number(e.target.value) as 118000 | 142600)}
+              className="w-full px-3 py-2 rounded border bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/30"
+              style={{ borderColor: 'var(--border)', backgroundColor: 'var(--background)' }}
+              required
+            >
+              {PRICE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            <p className="text-xs opacity-50 mt-1">
+              Used for auto-billing — 1 container = 1 DMC = this rate.
+            </p>
+          </div>
+
+          <hr style={{ borderColor: 'var(--border)' }} />
+
+          {/* Email */}
+          <div>
+            <label className="block text-sm opacity-70 mb-1">
+              Client email <span style={{ color: 'var(--destructive)' }}>*</span>
+            </label>
             <input
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 rounded border bg-transparent"
+              className="w-full px-3 py-2 rounded border bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/30"
               style={{ borderColor: 'var(--border)' }}
               placeholder="client@example.com"
               autoComplete="email"
+              required
             />
+            <p className="text-xs opacity-50 mt-1">Used for dashboard login and auto-invoice delivery.</p>
           </div>
 
+          {/* Password */}
           <div>
-            <label className="block text-sm opacity-70 mb-1">Password</label>
+            <label className="block text-sm opacity-70 mb-1">
+              Dashboard password <span style={{ color: 'var(--destructive)' }}>*</span>
+            </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 rounded border bg-transparent"
+              className="w-full px-3 py-2 rounded border bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/30"
               style={{ borderColor: 'var(--border)' }}
               autoComplete="new-password"
+              required
             />
           </div>
 
@@ -99,7 +153,7 @@ export function CreateClientPage({ onCreated, onCancel }: CreateClientPageProps)
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2 rounded border"
+              className="px-4 py-2 rounded border transition-colors hover:bg-muted"
               style={{ borderColor: 'var(--border)' }}
             >
               Cancel
@@ -107,7 +161,7 @@ export function CreateClientPage({ onCreated, onCancel }: CreateClientPageProps)
             <button
               disabled={submitting}
               type="submit"
-              className="px-4 py-2 rounded border disabled:opacity-60"
+              className="px-4 py-2 rounded border font-medium disabled:opacity-60 transition-colors"
               style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
             >
               {submitting ? 'Creating…' : 'Create Client'}
