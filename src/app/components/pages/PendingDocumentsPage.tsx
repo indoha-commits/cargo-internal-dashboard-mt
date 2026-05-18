@@ -75,7 +75,7 @@ export function PendingDocumentsPage() {
     const byClient = new Map<string, Map<string, PendingDoc[]>>();
     for (const d of filtered) {
       const clientName = d.client_name ?? 'Unknown Client';
-      const groupId = d.bill_of_lading ?? d.cargo_id;
+      const groupId = d.bill_of_lading ?? d.cargo_id ?? '';
       const cargos = byClient.get(clientName) ?? new Map<string, PendingDoc[]>();
       const list = cargos.get(groupId) ?? [];
       list.push(d);
@@ -84,11 +84,11 @@ export function PendingDocumentsPage() {
     }
 
     return Array.from(byClient.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
+      .sort(([a], [b]) => String(a ?? '').localeCompare(String(b ?? '')))
       .map(([clientName, cargos]) => ({
         clientName,
         cargos: Array.from(cargos.entries())
-          .sort(([a], [b]) => a.localeCompare(b))
+          .sort(([a], [b]) => String(a ?? '').localeCompare(String(b ?? '')))
           .map(([cargoId, documents]) => ({
             cargoId,
             documents: documents.slice().sort((a, b) => String(a.document_type).localeCompare(String(b.document_type))),

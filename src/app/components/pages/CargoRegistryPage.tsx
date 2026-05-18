@@ -127,7 +127,7 @@ export function CargoRegistryPage({
     const mapped = (res.groups ?? []).map((g) => ({
       billOfLading: g.bill_of_lading,
       clientId: g.client_id,
-      clientName: g.client_name,
+      clientName: g.client_name?.trim() || 'Unassigned client',
       category: g.category ?? null,
       containerCount: g.container_count,
       origin: g.origin ?? null,
@@ -161,7 +161,7 @@ export function CargoRegistryPage({
           const mapped = (res.groups ?? []).map((g) => ({
             billOfLading: g.bill_of_lading,
             clientId: g.client_id,
-            clientName: g.client_name,
+            clientName: g.client_name?.trim() || 'Unassigned client',
             category: g.category ?? null,
             containerCount: g.container_count,
             origin: g.origin ?? null,
@@ -220,7 +220,7 @@ export function CargoRegistryPage({
 
     return filtered
       .slice()
-      .sort((a, b) => a.clientName.localeCompare(b.clientName))
+      .sort((a, b) => (a.clientName ?? '').localeCompare(b.clientName ?? ''))
       .map((g) => ({
         ...g,
         cargos: g.cargos.slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))),

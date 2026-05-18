@@ -187,10 +187,12 @@ export function ValidationPage() {
     }
 
     return Array.from(byClient.values())
-      .sort((a, b) => a.clientName.localeCompare(b.clientName))
+      .sort((a, b) => (a.clientName ?? '').localeCompare(b.clientName ?? ''))
       .map((g) => ({
         ...g,
-        items: g.items.slice().sort((a, b) => a.cargo_id.localeCompare(b.cargo_id)),
+        items: g.items
+          .slice()
+          .sort((a, b) => String(a.cargo_id ?? '').localeCompare(String(b.cargo_id ?? ''))),
       }));
   }, [items]);
 

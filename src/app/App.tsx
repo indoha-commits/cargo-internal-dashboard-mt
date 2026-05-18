@@ -4,7 +4,13 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-
 import { Sidebar } from '@/app/components/Sidebar';
 import { OpsSidebarContent } from '@/app/components/OpsSidebarContent';
 import { getSupabase } from '@/app/auth/supabase';
-import { Sheet, SheetContent } from '@/app/components/ui/sheet';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/app/components/ui/sheet';
 import { useThemeToggle } from '@/app/hooks/useThemeToggle';
 import { DashboardPage } from '@/app/components/pages/DashboardPage';
 import { PendingDocumentsPage } from '@/app/components/pages/PendingDocumentsPage';
@@ -257,6 +263,10 @@ export default function App() {
       {/* Mobile nav drawer */}
       <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
         <SheetContent side="left" className="p-0" style={{ backgroundColor: 'var(--sidebar)' }}>
+          <SheetHeader className="sr-only">
+            <SheetTitle>Navigation menu</SheetTitle>
+            <SheetDescription>Operations dashboard pages</SheetDescription>
+          </SheetHeader>
           <OpsSidebarContent
             currentPage={currentPageMemo}
             onPageChange={(page) => setCurrentPage(page as OpsPageId)}
